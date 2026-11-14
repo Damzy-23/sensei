@@ -1,0 +1,15 @@
+# USD per 1,000,000 tokens. PLACEHOLDER values: verify against current Anthropic pricing before
+# quoting cost numbers in the demo. A model missing from this table logs cost_usd = null.
+claude-sonnet-5-5:
+  input: 3.0
+  output: 15.0
+claude-haiku-5-5:
+  input: 1.0
+  output: 5.0
+claude-opus-5-5:
+  input: 15.0
+  output: 75.0
+# OpenAI-compatible hint model. Name must match HINT_TUNED_MODEL; cost is zero on our own endpoint.
+hint-tuned:
+  input: 0.0
+  output: 0.0
