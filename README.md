@@ -1,5 +1,7 @@
 # Senior
 
+**Live demo: https://senior-coach-ai.web.app** (try it as a guest, no account needed)
+
 > Working name. The repository and the `SENSEI_*` settings keep the earlier name, Sensei, for now.
 
 A coding-interview coach built as a small team of AI agents. Senior gives graded,

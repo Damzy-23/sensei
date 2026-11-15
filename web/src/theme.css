@@ -367,10 +367,12 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 
 /* ---- The glass: a transparent pane between Senior and the student ---- */
 .gb { position: fixed; inset: 0; z-index: 30; pointer-events: none; }
-.gb-pane { position: absolute; top: 12px; left: 12px; bottom: 12px; border-radius: 28px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2);
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.07), rgba(255, 255, 255, 0.015));
-  box-shadow: 0 40px 100px -30px rgba(127, 209, 193, 0.28), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 160px rgba(134, 187, 216, 0.06);
-  -webkit-backdrop-filter: blur(2.5px) brightness(0.42) saturate(0.85); backdrop-filter: blur(2.5px) brightness(0.42) saturate(0.85);
+.gb-pane { position: absolute; top: 80px; left: 12px; bottom: 12px; border-radius: 28px; overflow: hidden; border: 1px solid rgba(255, 255, 255, 0.2);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.045), rgba(255, 255, 255, 0.01));
+  box-shadow: 0 40px 100px -30px rgba(127, 209, 193, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.24), inset 0 0 120px rgba(134, 187, 216, 0.04);
+  /* Clear glass: what is behind the pane is neither dimmed nor blurred, so the student can
+     still read their code. Each drawing carries its own small frosted plate (.gb-item). */
+  -webkit-backdrop-filter: none; backdrop-filter: none;
   opacity: 0; transform: scale(0.985); visibility: hidden;
   transition: opacity 0.45s var(--ease), transform 0.45s var(--ease), right 0.35s var(--ease), visibility 0s linear 0.45s; }
 .gb.up .gb-pane { opacity: 1; transform: none; visibility: visible; transition: opacity 0.45s var(--ease), transform 0.45s var(--ease), right 0.35s var(--ease); }
@@ -388,7 +390,7 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .gb-tick.tr { top: 10px; right: 10px; border-top-width: 2px; border-right-width: 2px; border-top-right-radius: 6px; }
 .gb-tick.bl { bottom: 10px; left: 10px; border-bottom-width: 2px; border-left-width: 2px; border-bottom-left-radius: 6px; }
 .gb-tick.br { bottom: 10px; right: 10px; border-bottom-width: 2px; border-right-width: 2px; border-bottom-right-radius: 6px; }
-.gb-head { position: absolute; top: 22px; left: 40px; display: flex; align-items: center; gap: 10px; font: 500 12px var(--body); color: var(--text-2); text-shadow: 0 1px 10px rgba(6, 12, 16, 0.9); }
+.gb-head { position: absolute; top: 22px; left: auto; right: 200px; display: flex; align-items: center; gap: 10px; font: 500 12px var(--body); color: var(--text-2); text-shadow: 0 1px 10px rgba(6, 12, 16, 0.9); }
 .gb-name { font: 700 15px var(--display); color: var(--text); letter-spacing: -0.2px; }
 .gb-live { width: 8px; height: 8px; border-radius: 999px; background: var(--seafoam); box-shadow: 0 0 10px var(--seafoam); animation: blink 1.6s ease-in-out infinite; display: inline-block; }
 .gb-ctl { position: absolute; top: 12px; right: 38px; display: flex; gap: 8px; pointer-events: auto; }
@@ -397,8 +399,12 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .gb-btn[aria-pressed="true"] { border-color: var(--sky); color: var(--sky); }
 .gb-board { position: absolute; inset: 64px 20px 20px 20px; overflow: auto; display: flex; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
 .gb-board.wiping { animation: gb-wipe 0.42s var(--ease) forwards; }
-.gb-flow { margin: auto; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 48px 64px; padding: 14px 26px 30px; max-width: 100%; }
+.gb-flow { margin: auto 0 0 auto; display: flex; flex-wrap: wrap-reverse; align-items: flex-end; justify-content: flex-end; gap: 28px 32px; padding: 14px 18px 18px; max-width: 100%; }
 .gb-item { position: relative; margin: 0; max-width: 100%; display: flex; flex-direction: column; align-items: center; gap: 14px; pointer-events: auto; color: #eaf2f7;
+  /* A small frosted plate behind each drawing only, so the drawing reads over the code while
+     the rest of the pane stays clear. */
+  padding: 22px 26px 18px; border-radius: 22px; border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(9, 17, 23, 0.5); -webkit-backdrop-filter: blur(7px); backdrop-filter: blur(7px);
   animation: gb-in 0.5s var(--ease) backwards; transition: filter 1.4s var(--ease); }
 .gb-item.fresh { filter: drop-shadow(0 0 22px rgba(134, 187, 216, 0.5)); transition: filter 0.2s; }
 .gb-item[data-kind="scene"] { width: min(560px, 100%); }
@@ -474,3 +480,6 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 @media (prefers-reduced-motion: reduce) {
   .ink { stroke-dashoffset: 0; } .write { opacity: 1; } .write-line { clip-path: none; }
 }
+
+/* The pane is clear, so its caption would read as part of the page behind it. The name is enough. */
+.gb-sub { display: none; }
