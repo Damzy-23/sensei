@@ -247,11 +247,16 @@ def test_tool_call_outside_implementation_is_traced_as_error() -> None:
 
 
 def test_sync_tool_wrapper_preserves_name_and_is_traced() -> None:
-    assert guard.regex_precheck.__name__ == "regex_precheck"
+    assert orchestrator.route_agent.__name__ == "route_agent"
     with turn("ses_reg2") as tctx:
         with pytest.raises(NotImplementedError):
-            guard.regex_precheck("hello")
-    assert any(e.name == "regex_precheck" and e.actor == "guard" for e in _trace(tctx.trace_id))
+            orchestrator.route_agent("learn", "hint")
+    assert any(e.name == "route_agent" and e.actor == "orchestrator" for e in _trace(tctx.trace_id))
+    # A live sync tool is traced too, and its guard verdict carries decision and reason.
+    with turn("ses_reg3") as tctx2:
+        assert guard.regex_precheck("hello")["decision"] == "pass"
+    ev = next(e for e in _trace(tctx2.trace_id) if e.name == "regex_precheck")
+    assert ev.actor == "guard" and ev.decision == "pass" and ev.reason
 
 
 def test_escalation_tools_are_registered_under_escalation_actor() -> None:
