@@ -40,6 +40,7 @@ export interface ToolSignatures {
   glass_3d: [{ scene: "bars" | "grid" | "tree" | "graph"; values: string[]; pointers?: string; water?: string; highlight?: string; edges?: string; caption?: string }, { drawn: number }];
   glass_clear: [Record<string, never>, Record<string, never>];
   play_explainer: [{ title: string; scenes: { caption: string; values: string; pointers: string }[] }, { playing: true; scenes: number; seconds: number }];
+  write_line: [{ after_line: number }, { written: string; at_line: number }];
   propose_calendar_event: [{ title: string; start: string; minutes: number; details: string }, { offered: true; start: string; end: string }];
 }
 export type ToolName = keyof ToolSignatures;

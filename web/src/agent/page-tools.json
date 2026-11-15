@@ -173,7 +173,7 @@
     "parameters": {}
   },
   "run_code": {
-    "description": "Run the student's code exactly as written and return what it printed (stdout) and any error. Use it to see what their code actually does before you talk about it. You cannot change their code.",
+    "description": "Run the student's code exactly as written and return what it printed (stdout) and any error. Use it to see what their code actually does before you talk about it.",
     "parameters": {}
   },
   "read_code": {
@@ -255,6 +255,15 @@
             "pointers"
           ]
         }
+      }
+    }
+  },
+  "write_line": {
+    "description": "Write one line into the student's code for them. The line is the one you last offered them through ask_coach, which only happens after they have tried a few times; you cannot supply the code yourself. Use it when they ask you to add or write the line. Say where you put it.",
+    "parameters": {
+      "after_line": {
+        "type": "integer",
+        "description": "Insert after this line number of their code, as shown by read_code. Use 0 for the top."
       }
     }
   }

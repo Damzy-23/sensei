@@ -151,7 +151,8 @@ function BulletRow({ score, onChange, onRemove }: { score: BulletScore; onChange
 
 function ResearchCard({ roleTitle, company }: { roleTitle: string; company: string }) {
   const [role, setRole] = useState(roleTitle);
-  const [employer, setEmployer] = useState(company);
+  // Blank by default: a short or little-known company name can pull the search onto an unrelated site.
+  const [employer, setEmployer] = useState("");
   const [state, setState] = useState<ResearchState>({ status: "idle" });
 
   const run = async (event: FormEvent) => {
@@ -185,7 +186,7 @@ function ResearchCard({ roleTitle, company }: { roleTitle: string; company: stri
         </div>
         <div style={{ flex: "1 1 160px" }}>
           <label className="dim" style={{ fontSize: 12 }} htmlFor="research-company">Company (optional)</label>
-          <input id="research-company" className="input" value={employer} onChange={(e) => setEmployer(e.target.value)} />
+          <input id="research-company" className="input" value={employer} placeholder={company ? `e.g. ${company}` : ""} onChange={(e) => setEmployer(e.target.value)} />
         </div>
         <button type="submit" className="btn-ghost" disabled={state.status === "busy" || role.trim().length < 2}>
           {state.status === "busy" ? "Searching…" : "Search the web"}

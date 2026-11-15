@@ -18,7 +18,9 @@ to trust when nobody can see why it said what it said or what it cost.
 ## What it does
 
 - **Learn mode.** A hint coach answers on a ladder from level 0 to 5. Each request
-  for help moves one step up. No level ever contains code.
+  for help moves one step up. Hints are in words. Code is earned by trying: after three
+  tries on a problem the coach may give one line at a time, three lines at most, and can
+  write it into the editor when asked. Never in an interview.
 - **Interview and blitz modes.** An interviewer probes the approach and its cost
   without teaching. Blitz adds a 10-minute countdown.
 - **A two-interviewer panel.** In interview modes a lead interviewer asks while an observer
@@ -74,22 +76,27 @@ Interactive API docs: http://localhost:8000/docs
 
 ## Status
 
-Built and tested: the turn loop for learn, interview, blitz and call modes, both guards,
-escalation and the mentor queue, test-run handling with mastery, tracing with cost, the
-track catalogue, the CV studio, and the web app (workspace, learn path, blitz lab, CV studio,
-agent inspector, mentor queue, landing page, sign-in).
+Built and tested: the turn loop for learn, interview, blitz and call modes; both guards;
+escalation and the mentor queue; test-run handling with mastery; tracing with cost; the
+two-interviewer panel with scored feedback (the observer and evaluator agents); the CV studio
+with job fit, line scores and role research; the track catalogue, with ten problems that have
+full statements and runnable tests; and the web app (workspace, learn path, blitz lab,
+profile, CV studio, agent inspector, mentor queue, activity log, landing page, sign-in).
 
-Built and tested by typed message to the live agent: the voice guide opens a problem and
-draws on the glass through its page tools. It has 18 tools: it can read the page, the
-problem, the code and the conversation, run the code and the tests and read their output,
-explain the coach's last turn, search and open problems, switch mode and screen, point at
-lines, and draw arrays, steps and notes on the glass. It cannot edit the student's code.
-Not yet tested with a real speaker, and the glass refuses anything that looks like code.
+Built and tested by typed message to the live agent: the voice coach. It has 22 page tools:
+it can read the page, the problem, the code and the conversation, run the code and the tests
+and read their output, explain its last turn, search and open problems, switch mode and
+screen, point at lines, draw arrays, steps, notes and 3D pictures on the glass, play a short
+narrated explainer, and offer a practice session for the calendar. The only code it can
+write into the editor is a line the coach has offered once the student has earned it, and
+the glass refuses anything that looks like code. Not yet tested with a
+real speaker.
 
-Not built yet: phone calls (needs a phone number on the voice provider), the evaluator and
-planner agents, the tuned-versus-base hint model evaluation (`/eval/results` returns
-placeholder data), diagrams, generated video, and full statements and tests for most
-track problems (two have them).
+Not built yet: phone calls (needs a phone number on the voice provider); the planner agent;
+the tuned-versus-base hint model evaluation (`/eval/results` returns placeholder data);
+generated video files (explainers are animations drawn in the page); and full statements and
+tests for the rest of the track problems. The API does not require sign-in: guests are
+allowed, so the mentor queue and the activity log are open to anyone with the address.
 
 ## Live demo
 

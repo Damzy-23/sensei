@@ -2,7 +2,7 @@
 // tools (glass_array, glass_steps, glass_note, glass_clear), so the agent's drawings go
 // through the same registry, and the same limits, as every other action it takes.
 
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { SceneKind, SceneSpec } from "./Scene3D";
 import { registerTool } from "./tools";
 
@@ -22,6 +22,7 @@ type WithoutId<T> = T extends unknown ? Omit<T, "id"> : never;
 type NewItem = WithoutId<Item>;
 
 const MAX_ITEMS = 4;
+const CLEAR_AFTER_MS = 45_000; // a drawing nobody is looking at any more wipes itself
 const MAX_CELLS = 16;
 export const LOOKS_LIKE_CODE = /```|^\s*(def |for .+ in .+:|while .+:|return\b|import )/m;
 
@@ -52,6 +53,16 @@ function refuseCode(...texts: string[]): void {
 
 export function Glass() {
   const [items, setItems] = useState<Item[]>([]);
+  const looking = useRef(false);
+
+  // The glass wipes itself a while after the last drawing, so nobody has to clear it by hand.
+  // Pointing at it (hover, or turning a 3D picture) keeps it; the clock restarts on leaving.
+  const [restart, setRestart] = useState(0);
+  useEffect(() => {
+    if (items.length === 0) return;
+    const timer = window.setTimeout(() => { if (!looking.current) setItems([]); }, CLEAR_AFTER_MS);
+    return () => window.clearTimeout(timer);
+  }, [items, restart]);
 
   useEffect(() => {
     let nextId = 0;
@@ -111,7 +122,9 @@ export function Glass() {
 
   if (items.length === 0) return null;
   return (
-    <aside aria-label="Glass" aria-live="polite" className="glass">
+    <aside aria-label="Glass" aria-live="polite" className="glass"
+      onPointerEnter={() => { looking.current = true; }}
+      onPointerLeave={() => { looking.current = false; setRestart((n) => n + 1); }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span className="label">Glass · drawn by Senior</span>
         <button className="btn-ghost" style={{ height: 30, marginLeft: "auto", padding: "0 12px" }} onClick={() => setItems([])}>Clear</button>

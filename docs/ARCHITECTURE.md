@@ -14,9 +14,10 @@ The API contract is in [API.md](API.md). Decisions and their reasons are in
 
 **Status.** The turn loop is built and tested end to end against a scripted
 model: input guard, agent selection, hint ladder, hint coach and interviewer,
-leak check with rewrite, escalation to a mentor, and test-run handling, all
-traced. It runs when `SENSEI_USE_STUBS=0`. Not built yet: the evaluator and
-planner agents, the eval harness, and full statements for most track problems.
+the observer who sits in on interviews, leak check with rewrite, escalation to a
+mentor, test-run handling, and the evaluator's scored feedback, all traced. It
+runs when `SENSEI_USE_STUBS=0`. Not built yet: the planner agent, the eval
+harness for a tuned hint model, and full statements for most track problems.
 Each row below says which.
 
 ## One turn, end to end
@@ -51,7 +52,7 @@ never call each other.
 
 | Block | What it means here | Where | Status |
 |---|---|---|---|
-| **Role-playing** | Four specialists, each with one role: `interviewer`, `hint_coach` (Socratic hints at levels 1–5), `evaluator`, `planner`. A fifth role, `mentor`, is a human. | `app/agents/`, `app/prompts/` (one versioned file per role) | `hint_coach` and `interviewer` built; `evaluator` and `planner` not yet |
+| **Role-playing** | Specialists with one role each: `hint_coach` (Socratic hints at levels 1–5), `interviewer`, `caller` (a spoken interview), `observer` (the silent second interviewer), `evaluator` (end-of-interview feedback), `cv_writer`, `job_analyst`. One more role, `mentor`, is a human. | `app/agents/`, `app/prompts/` (one versioned file per role) | Built, except `planner` |
 | **Focus** | The mode decision picks which agent may act. The hint ladder caps what the coach may reveal. Each agent gets only the context its job needs. Fast model for guards, reasoning model for agents. | `app/orchestrator/rules.py`, `app/agents/context.py` | Built |
 | **Tools** | Typed calls: read problem and visible tests, read the latest run, update mastery, escalate to mentor. Escalation is a tool, so human-in-the-loop is a traced call. | `app/tools/` | `escalate_to_mentor` and `update_mastery` built |
 | **Cooperation** | Supervisor pattern: the orchestrator hands each turn to exactly one specialist and escalates to a human on fixed triggers. | `app/orchestrator/turn.py`, `app/api/mentor.py` | Built |

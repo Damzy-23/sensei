@@ -19,6 +19,7 @@ class AgentContext:
     countdown_seconds: int | None = None
     rewrite_note: str | None = None  # set when the output guard blocked the previous draft
     reexplain: bool = False  # the student did not understand the last reply
+    code_help: str = "none"  # "none" or "one_line": how much code this reply may contain
 
     def render(self) -> str:
         parts = [f"Problem: {self.problem_title} ({self.difficulty}, pattern: {self.pattern})"]
@@ -28,13 +29,18 @@ class AgentContext:
             parts.append("Conversation so far:\n" + "\n".join(f"{actor}: {text}" for actor, text in self.history))
         parts.append(f"Student's current code:\n{self.student_code.strip() or '(nothing written yet)'}")
         parts.append(f"Consecutive failed test runs: {self.failed_runs}")
+        parts.append(
+            "Code allowed this turn: ONE line. The student has tried enough to earn it."
+            if self.code_help == "one_line" else "Code allowed this turn: none."
+        )
         if self.countdown_seconds is not None:
             parts.append(f"Blitz mode. Seconds remaining: {self.countdown_seconds}")
         parts.append(f"Student's message: {self.student_message}")
         if self.reexplain:
             parts.append(
-                "The student did not understand your last message. Explain the same idea again in a different "
-                "way: smaller words and one small concrete example, in words. Stay at the same hint level."
+                "The student did not understand your last message. Say the same hint again in a different way: "
+                "smaller words and an everyday comparison. Stay at the same hint level, and add nothing that level "
+                "does not allow: no technique or data structure it has not yet named, and no walk through the steps."
             )
         if self.rewrite_note:
             parts.append(f"Your previous draft was rejected: {self.rewrite_note} Rewrite it in words only.")

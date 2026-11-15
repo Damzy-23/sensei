@@ -24,6 +24,7 @@ const MAX_CELLS = 12;
 const WORDS_PER_SECOND = 2.6; // an unhurried speaking pace
 const MIN_SCENE_SECONDS = 3;
 const GAP_MS = 500;
+const CLOSE_AFTER_END_MS = 4000; // long enough to press Play again
 
 const PERSONAS = ["drill", "mentor", "peer"];
 
@@ -131,13 +132,21 @@ export function Explainer() {
     return () => { cancelled = true; stopAudio(); };
   }, [show, index, paused, finished]);
 
+  // When it has finished, it closes by itself. Moving onto it (to press Play again) keeps it open.
+  const [held, setHeld] = useState(false);
+  useEffect(() => {
+    if (!show || !finished || held) return;
+    const closing = window.setTimeout(close, CLOSE_AFTER_END_MS);
+    return () => window.clearTimeout(closing);
+  }, [show, finished, held, close]);
+
   useEffect(() => () => { stopAudio(); dropNarration(); }, []);
 
   if (!show) return null;
   const scene = show.scenes[index];
   return (
     <div className="explainer-backdrop" role="dialog" aria-modal="true" aria-label={`Explainer: ${show.title}`}>
-      <div className="explainer">
+      <div className="explainer" onPointerEnter={() => setHeld(true)} onPointerLeave={() => setHeld(false)}>
         <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
           <div>
             <div className="label">Explainer · scene {index + 1} of {show.scenes.length}</div>

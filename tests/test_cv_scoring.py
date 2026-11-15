@@ -151,6 +151,11 @@ def test_research_reports_each_search_that_is_not_set_up(client: TestClient) -> 
     assert body["linkup"] == {"available": False, "reason": "Linkup is not set up on this server (LINKUP_API_KEY is missing).", "answer": "", "sources": []}
     assert body["exa"]["available"] is False and "EXA_API_KEY" in body["exa"]["reason"]
     assert body["trace_id"].startswith("trc_")
+    # A search that was never set up is logged as skipped, not as an error.
+    from app.tracing import store
+
+    exa_event = next(e for e in store.load_trace(body["trace_id"]) if e.name == "exa.search")
+    assert (exa_event.status, exa_event.decision) == ("blocked", "skipped")
 
 
 def test_research_in_stub_mode_returns_both_sample_searches(client: TestClient, monkeypatch) -> None:

@@ -44,6 +44,25 @@ def next_hint_level(session: Session, category: str) -> Decision:
     return Decision(str(session.hint_level + 1), "hint.step", f"student asked for help at level {session.hint_level}")
 
 
+def code_help(session: Session) -> Decision:
+    """How much code the coach may give this turn: "none" or "one_line".
+
+    A line of code is help the student earns by trying. It is never given in an interview,
+    never before they have made a few attempts, and never past a small total per problem.
+    """
+    if session.mode != "learn":
+        return Decision("none", "code.not_in_interview", "no code is given in an interview")
+    if session.code_lines_given >= policy.CODE_LINES_PER_PROBLEM:
+        return Decision("none", "code.limit", f"{session.code_lines_given} lines already given on this problem")
+    tries = session.hints_used + session.failed_runs
+    if tries >= policy.CODE_HELP_AFTER_TRIES:
+        return Decision(
+            "one_line", "code.earned",
+            f"{session.hints_used} requests for help and {session.failed_runs} failed runs on this problem",
+        )
+    return Decision("none", "code.not_yet", f"{tries} of {policy.CODE_HELP_AFTER_TRIES} tries so far")
+
+
 def should_escalate(session: Session, category: str) -> Decision | None:
     """Human-in-the-loop triggers. None when no rule fires or a mentor is already involved."""
     if session.escalated:

@@ -46,15 +46,20 @@ STUB_PAGES = [
 
 async def search(query: str, *, actor: Actor = "cv_writer", results: int = 5) -> list[ExaPage]:
     """Search the web and return up to `results` pages."""
+    stubbed = get_settings().use_stubs
+    key = os.getenv("EXA_API_KEY", "").strip()
+    if not stubbed and not key:
+        # Recorded as a skipped call and raised after the span closes: a search that was never
+        # set up is not a failure of the search, and must not be logged as one.
+        with span(actor, "tool.call", "exa.search", query) as st:
+            st.model = "exa/auto"
+            st.decision, st.reason, st.status = "skipped", "EXA_API_KEY is not set", "blocked"
+        raise ExaNotConfigured("Exa is not set up on this server (EXA_API_KEY is missing).")
     with span(actor, "tool.call", "exa.search", query) as st:
         st.model = "exa/auto"
-        if get_settings().use_stubs:
+        if stubbed:
             st.decision, st.reason = "stub", "SENSEI_USE_STUBS=1: fixed results, no network"
             return STUB_PAGES
-        key = os.getenv("EXA_API_KEY", "").strip()
-        if not key:
-            st.decision, st.reason, st.status = "skipped", "EXA_API_KEY is not set", "blocked"
-            raise ExaNotConfigured("Exa is not set up on this server (EXA_API_KEY is missing).")
         try:
             async with httpx.AsyncClient(timeout=30) as http:
                 response = await http.post(

@@ -54,16 +54,16 @@ def _record(decision: rules.Decision, name: str, event_type: str = "mode.decisio
         st.decision, st.reason, st.output = decision.value, decision.reason, decision.value
 
 
-async def _draft_reply(agent: str, ctx: AgentContext) -> str:
+async def _draft_reply(agent: str, ctx: AgentContext, allowed_code_lines: int = 0) -> str:
     """Run the specialist, then the output guard. A blocked draft gets one rewrite."""
     reply = await AGENTS[agent](ctx)
     for _ in range(policy.MAX_LEAK_RETRIES):
-        verdict = leak.check(reply)
+        verdict = leak.check(reply, allowed_code_lines)
         if not verdict.leaked:
             return reply
         ctx = AgentContext(**{**ctx.__dict__, "rewrite_note": verdict.reason})
         reply = await AGENTS[agent](ctx)
-    return policy.LEAK_FALLBACK_REPLY if leak.check(reply).leaked else reply
+    return policy.LEAK_FALLBACK_REPLY if leak.check(reply, allowed_code_lines).leaked else reply
 
 
 async def _observe(ctx: AgentContext) -> list[dict]:
@@ -103,6 +103,11 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
                     if int(level.value) > session.hint_level or level.rule == "hint.max":
                         session.hints_used += 1
                     session.hint_level = int(level.value)
+                # A line of code is earned by trying; decided by rule, in learn mode only.
+                code = rules.code_help(session)
+                if agent.value == "hint_coach":
+                    _record(code, "select_code_help")
+                code_lines = 1 if code.value == "one_line" else 0
                 # The transcript stores every agent reply as "coach"; in an interview that speaker is the interviewer.
                 speaker = "interviewer" if agent.value in PANEL_AGENTS else "coach"
                 history = [
@@ -114,6 +119,7 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
                     statement=catalog.statement(problem.id), student_message=body.text, student_code=body.code,
                     history=history, hint_level=session.hint_level, failed_runs=session.failed_runs,
                     countdown_seconds=countdown(session), reexplain=verdict.category == "confused",
+                    code_help=code.value,
                 )
                 if agent.value in PANEL_AGENTS:
                     # The lead answers while the observer takes notes: side by side, so the panel adds no wait.
@@ -121,7 +127,9 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
                     if signals:
                         session.panel_notes.extend(leak.keep_safe_notes(signals))
                 else:
-                    reply = await _draft_reply(agent.value, ctx)
+                    reply = await _draft_reply(agent.value, ctx, code_lines)
+                    if leak.decide(reply, code_lines).code_lines:
+                        session.code_lines_given += 1
 
             escalation = rules.should_escalate(session, verdict.category)
             if escalation is not None:

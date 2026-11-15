@@ -50,6 +50,31 @@ async function loadProblem(problemId: string): Promise<{ problem: Problem; detai
   throw new Error(`Problem ${problemId} is not in the catalogue.`);
 }
 
+/** The one line of code the coach offered in a reply: a line that is nothing but a backticked
+ *  statement. Null when the reply offers none. The coach decides the code; nothing here writes it. */
+function offeredLineIn(reply: string): string | null {
+  for (const raw of reply.split("\n")) {
+    const line = raw.trim();
+    if (line.length > 2 && line.startsWith("`") && line.endsWith("`") && line.split("`").length === 3 && /[=()\[\]:]/.test(line)) {
+      return line.slice(1, -1).trim();
+    }
+  }
+  return null;
+}
+
+/** Put `line` into `source` after line number `after` (1-based; null means after the last
+ *  line that has code). It takes the indentation of the line above, one level deeper when
+ *  that line opens a block. Returns the new source and the line number written. */
+function withLineAdded(source: string, line: string, after: number | null): { source: string; at: number } {
+  const lines = source.replace(/\s+$/, "").split("\n");
+  let above = after === null ? lines.length : Math.max(0, Math.min(after, lines.length));
+  if (after === null) while (above > 0 && !lines[above - 1].trim()) above -= 1;
+  const prev = above > 0 ? lines[above - 1] : "";
+  const indent = (/^\s*/.exec(prev)?.[0] ?? "") + (prev.trimEnd().endsWith(":") ? "    " : "");
+  lines.splice(above, 0, indent + line);
+  return { source: lines.join("\n") + "\n", at: above + 1 };
+}
+
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
 export function Workspace() {
@@ -91,6 +116,10 @@ export function Workspace() {
     if (sessionId) setSession(await getState(sessionId));
   }, [sessionId]);
 
+  // Read the state as soon as a session exists, so what the mode shows from the start (the
+  // Blitz clock, an escalation) is on screen before the first message, not after it.
+  useEffect(() => { refresh().catch(() => undefined); }, [refresh]);
+
   // Once a mentor has the session, show their replies in this chat as they arrive.
   const seenMentor = useRef(new Set<string>());
   useEffect(() => { seenMentor.current = new Set(); }, [sessionId]);
@@ -104,9 +133,9 @@ export function Workspace() {
       }
     }, () => undefined);
     poll();
-    const timer = setInterval(poll, 3000);
+    const timer = setInterval(() => { poll(); refresh().catch(() => undefined); }, 3000);
     return () => clearInterval(timer);
-  }, [sessionId, session?.escalated, say]);
+  }, [sessionId, session?.escalated, say, refresh]);
 
   // Blitz countdown: re-read the server's clock rather than keeping a second one here.
   useEffect(() => {
@@ -114,6 +143,10 @@ export function Workspace() {
     const timer = setInterval(() => { refresh().catch(() => undefined); }, 1000);
     return () => clearInterval(timer);
   }, [mode, sessionId, session?.problem_id, refresh]);
+
+  // The line of code in the coach's latest reply, if it offered one (it does so only once earned).
+  const lastCoachBubble = [...bubbles].reverse().find((b) => b.kind === "coach");
+  const offeredLine = lastCoachBubble ? offeredLineIn(lastCoachBubble.text) : null;
 
   const ask = useCallback(async (text: string) => {
     if (!sessionId) throw new Error("The session is not ready yet.");
@@ -210,9 +243,15 @@ export function Workspace() {
       }),
       registerTool("highlight_lines", (range) => { setHighlight(range); return { from: range.from, to: range.to }; }),
       registerTool("clear_highlight", () => { setHighlight(null); return {}; }),
+      registerTool("write_line", ({ after_line }) => {
+        if (!offeredLine) throw new Error("There is no line to write yet. Think it through with ask_coach first: a line is offered only after the student has tried a few times.");
+        const added = withLineAdded(code, offeredLine, Number.isInteger(after_line) ? after_line : null);
+        setCode(added.source);
+        return { written: offeredLine, at_line: added.at };
+      }),
     ];
     return () => cleanups.forEach((off) => off());
-  }, [page, mode, loaded, session, tests, code, bubbles, go, setMode, openProblem, ask, run]);
+  }, [page, mode, loaded, session, tests, code, bubbles, offeredLine, go, setMode, openProblem, ask, run]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();
@@ -239,7 +278,9 @@ export function Workspace() {
           ))}
         </div>
         {mode === "blitz" && session?.countdown_seconds != null && (
-          <span className="pill sky" aria-label="Time remaining">Blitz · {clock(session.countdown_seconds)} left</span>
+          <span className="pill sky" aria-label="Time remaining">
+            Blitz · {clock(session.countdown_seconds)} {session.problem_id ? "left" : "on the clock, starts with your first answer"}
+          </span>
         )}
         {session?.escalated && <span className="pill baltic">A mentor has this session</span>}
         <div aria-label="Pattern mastery" style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -259,7 +300,7 @@ export function Workspace() {
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                   <h1>{loaded.problem.title}</h1>
                   <span className="pill" style={{ color: DIFFICULTY_COLOR[loaded.problem.difficulty] }}>{loaded.problem.difficulty}</span>
-                  <span className="chip" style={{ color: "var(--text-2)" }}>{patternName(loaded.problem.pattern)}</span>
+                  {mode === "learn" && <span className="chip" style={{ color: "var(--text-2)" }}>{patternName(loaded.problem.pattern)}</span>}
                   <button className="btn-ghost" style={{ marginLeft: "auto", height: 36 }} onClick={() => go("tracks")}>Change problem</button>
                 </div>
                 <p className="statement">
@@ -354,6 +395,12 @@ export function Workspace() {
               <div key={b.id} className={`bubble ${b.kind}`} role={b.kind === "notice" ? "alert" : undefined}>
                 {b.meta && <span className="bubble-meta">{b.meta}</span>}
                 <RichText text={b.text} />
+                {offeredLine && b.id === lastCoachBubble?.id && (
+                  <button type="button" className="btn-ghost" style={{ height: 32, marginTop: 8, padding: "0 12px", fontSize: 12 }}
+                    onClick={() => setCode(withLineAdded(code, offeredLine, null).source)}>
+                    Add this line to my code
+                  </button>
+                )}
               </div>
             ))}
             {busy && <div className="bubble coach thinking" role="status"><span className="dots" aria-hidden="true"><i /><i /><i /></span><span className="mono">{busy}</span></div>}

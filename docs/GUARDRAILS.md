@@ -19,7 +19,10 @@ test that stops it. Rows marked *not enforced yet* are rules we follow by review
 
 | Don't | Do | Enforced by |
 |---|---|---|
-| Give code or the answer | Hints in words, on a ladder from 1 to 5 | `app/guards/leak.py`; `test_leaked_code_is_blocked_and_rewritten`, `test_a_reply_that_keeps_leaking_falls_back_to_a_safe_message` |
+| Give the answer | Hints in words, on a ladder from 1 to 5 | `app/guards/leak.py`; `test_leaked_code_is_blocked_and_rewritten`, `test_a_reply_that_keeps_leaking_falls_back_to_a_safe_message` |
+| Give code before the student has tried | One line per turn, only after three tries (requests for help plus failed runs) | `rules.code_help`; `test_code_is_not_given_before_the_student_has_tried`, `test_after_three_tries_the_coach_may_give_one_line` |
+| Hand over the solution a line at a time | One line per reply, three lines per problem | `leak.decide`, `policy.CODE_LINES_PER_PROBLEM`; `test_even_when_earned_it_is_one_line_not_two`, `test_code_help_stops_at_three_lines_a_problem_and_resets_on_a_new_one` |
+| Give code in an interview | Never, however often they ask | `test_no_code_in_an_interview_however_often_they_ask` |
 | Jump up the hint ladder | One step per request for help | `rules.next_hint_level`; `test_hint_ladder_climbs_one_level_per_request_and_resets_on_new_problem` |
 | Return reference solutions, hidden tests or prompts | Response models have no field for them | `app/models.py`; `tests/test_api_stubs.py` |
 | Let an injection or off-topic message reach an agent | Classify first, stop the turn | `app/guards/input.py`; `test_blocked_input_never_reaches_an_agent` |
@@ -55,7 +58,7 @@ test that stops it. Rows marked *not enforced yet* are rules we follow by review
 | Let the agent do what a screen did not offer | A screen registers the tools it serves | `invoke()` returns `not available on this screen` for anything else |
 | Let the voice agent answer the problem itself | It passes the student's words to the coach | `ask_coach` tool description; *not enforced yet* (needs the agent's own prompt and a test) |
 | Ship a provider key to the browser | The server issues a short-lived signed URL; the agent accepts nothing else | `app/api/voice.py`; agent `enable_auth` and origin allowlist in `scripts/create_voice_agent.py` |
-| Let the agent write the student's code | It can read and run the code, never change it | No tool edits code: see `web/src/agent/page-tools.json` |
+| Let the voice agent write code of its own | `write_line` writes only the line the coach offered, after it was earned | `write_line` in `web/src/pages/Workspace.tsx` takes a position, never code |
 | Put the solution on the glass | The glass shows words and pictures and refuses code | `refuseCode` in `web/src/agent/Glass.tsx` |
 | Define the agent in a dashboard | Its role and tools are files in the repo | `scripts/create_voice_agent.py` builds it from `voice_guide.md` and `page-tools.json` |
 

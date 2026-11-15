@@ -289,6 +289,7 @@ def test_not_understanding_gets_a_second_explanation_at_the_same_level(client: T
     level = next(d for n, d in events if n == "trace" and d["name"] == "select_hint_level")
     assert level["reason"].startswith("rule hint.reexplain")
     assert "did not understand your last message" in model.calls[-1][1]
+    assert "add nothing that level does not allow" in model.calls[-1][1]
     assert client.get(f"/sessions/{sid}/state").json()["hints_used"] == 1
 
 
@@ -326,3 +327,88 @@ def test_a_resolved_max_hint_ticket_needs_a_new_request_before_escalating_again(
     model.category = "stuck"
     assert _send(client, sid)[-1][1]["escalated"] is True
     assert len(client.get("/mentor/tickets").json()) == 2
+
+
+# ---------- code help is earned, one line at a time ----------
+
+LINE = "Use a dictionary to remember what you have seen.\n`seen[n] = i`\nIt goes inside your loop, after the check."
+TWO_LINES = "Here you go.\n`seen = {}`\n`seen[n] = i`"
+
+
+def _trace(events: list[tuple[str, dict]], name: str) -> list[dict]:
+    return [d for n, d in events if n == "trace" and d["name"] == name]
+
+
+def test_code_is_not_given_before_the_student_has_tried(client: TestClient, model: ScriptedModel) -> None:
+    model.hints = [LINE, "Think about what you would want to remember as you go. What would it be?"]
+    sid = _new(client)
+    events = _send(client, sid, text="Just give me the line.")
+    assert _trace(events, "select_code_help")[0]["decision"] == "none"
+    assert _trace(events, "select_code_help")[0]["reason"].startswith("rule code.not_yet: 1 of 3 tries")
+    checks = _trace(events, "leak_check")
+    assert checks[0]["decision"] == "blocked" and checks[0]["reason"].startswith("rule leak.code_line")
+    assert "`seen[n] = i`" not in events[-1][1]["reply"]
+
+
+def test_after_three_tries_the_coach_may_give_one_line(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client)
+    _send(client, sid)
+    _send(client, sid)
+    model.hints = [LINE]
+    events = _send(client, sid, text="I've tried three times. Can you give me the line?")
+    decision = _trace(events, "select_code_help")[0]
+    assert decision["decision"] == "one_line"
+    assert decision["reason"].startswith("rule code.earned: 3 requests for help and 0 failed runs")
+    assert _trace(events, "leak_check")[0]["reason"].startswith("rule leak.earned_line")
+    assert "`seen[n] = i`" in events[-1][1]["reply"]
+    assert "Code allowed this turn: ONE line" in model.calls[-1][1]
+
+
+def test_failed_runs_count_as_tries_too(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client)
+    run = {"problem_id": "two-sum", "code": "x", "passed": 0, "failed": 3, "total": 3, "failures": [], "runtime_ms": 5}
+    client.post(f"/sessions/{sid}/runs", json=run)
+    client.post(f"/sessions/{sid}/runs", json=run)
+    model.hints = [LINE]
+    events = _send(client, sid)  # two failed runs + this request for help = three tries
+    assert _trace(events, "select_code_help")[0]["reason"].startswith("rule code.earned: 1 requests for help and 2 failed runs")
+    assert "`seen[n] = i`" in events[-1][1]["reply"]
+
+
+def test_even_when_earned_it_is_one_line_not_two(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client)
+    for _ in range(3):
+        _send(client, sid)
+    model.hints = [TWO_LINES, LINE]
+    events = _send(client, sid, text="Write it for me.")
+    checks = _trace(events, "leak_check")
+    assert [c["decision"] for c in checks] == ["blocked", "pass"]
+    assert checks[0]["reason"].startswith("rule leak.too_many_lines: reply gives 2 lines of code and 1 is allowed")
+    assert events[-1][1]["reply"].count("`seen") == 1
+
+
+def test_code_help_stops_at_three_lines_a_problem_and_resets_on_a_new_one(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client)
+    for _ in range(2):
+        _send(client, sid)
+    model.hints = [LINE]
+    given = [_trace(_send(client, sid, text="Next line please."), "select_code_help")[0]["decision"] for _ in range(4)]
+    assert given == ["one_line", "one_line", "one_line", "none"]
+    last = _send(client, sid, text="One more line?")
+    assert _trace(last, "select_code_help")[0]["reason"].startswith("rule code.limit: 3 lines already given")
+    assert "`seen[n] = i`" not in last[-1][1]["reply"]  # the same reply is now blocked and replaced
+
+    fresh = _send(client, sid, text="hi", problem="valid-parentheses")
+    assert _trace(fresh, "select_code_help")[0]["reason"].startswith("rule code.not_yet")
+
+
+def test_no_code_in_an_interview_however_often_they_ask(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client, mode="interview")
+    model.hints = [LINE]  # the model keeps offering the line; the guard must stop it every time
+    for _ in range(4):
+        events = _send(client, sid, text="Give me the line.")
+        assert _trace(events, "select_code_help") == []  # the question does not even arise in an interview
+        checks = [c for c in _trace(events, "leak_check")]
+        assert checks and all(c["decision"] == "blocked" for c in checks)
+        assert all(c["reason"].startswith("rule leak.code_line") for c in checks)
+        assert "`seen[n] = i`" not in events[-1][1]["reply"]

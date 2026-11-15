@@ -23,7 +23,7 @@ Run: `uvicorn app.main:app --reload --port 8000`
 | Field | Values |
 |---|---|
 | `difficulty` | `easy`, `medium`, `hard` |
-| `mode` | `learn`, `interview`, `blitz` |
+| `mode` | `learn`, `interview`, `blitz`, `call` |
 | `hint_level` | integer `0`–`5` (0 = no hint yet) |
 | `next_action` | `keep_coding`, `ask_for_hint`, `review_complexity`, `escalate` |
 | `actor` (trace) | `client`, `guard`, `orchestrator`, `interviewer`, `hint_coach`, `evaluator`, `planner`, `mentor`, `escalation` |
@@ -301,6 +301,28 @@ Phase 1 returns `"status": "stub"` with zero counts. Phase 7+ returns `"status":
 }
 ```
 `win_rate` is the tuned model's win rate against base when judged pairwise. Leakage is a hard fail, counted in `leak_rate`.
+
+---
+
+## Other routes
+
+These exist and are tested, but are not written out in full here. Their exact request and
+response shapes are in the interactive docs at `/docs` (generated from the code).
+
+| Route | What it does |
+|---|---|
+| `GET /sessions/{session_id}/mentor-messages` | The mentor's replies for a session, so the student's chat can show them |
+| `POST /voice/session` | A short-lived signed URL for a browser voice call. The provider key stays on the server |
+| `POST /voice/tts` | Speaks up to 600 characters in a coach's voice (`persona`: `drill`, `mentor` or `peer`) and returns MP3. Cached and rate limited |
+| `POST /cv/tailor` | Rewrites a CV for a job from the candidate's own facts; returns job fit, a score for every line, gaps and drafted lines |
+| `POST /cv/score` | Scores CV lines by rule. No model is called |
+| `POST /cv/research` | Looks a role up on the web through Linkup and Exa; each search reports whether it ran |
+| `POST /profile`, `GET /profile/{id}`, `POST /profile/{id}/answer`, `POST /profile/{id}/recommend` | The career interview and role recommendations |
+| `GET /logs` | The activity log: recent actions by every agent |
+
+Trace events are written when a span finishes, so the root node of a trace tree carries the
+`turn.end` event, with the turn's total latency. Actors also include `caller`, `observer`,
+`job_analyst`, `cv_writer` and the career agent.
 
 ---
 
