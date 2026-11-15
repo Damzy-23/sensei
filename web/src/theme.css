@@ -308,3 +308,4 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
   .nav-group-label { display: none; }
   .nav-group + .nav-group { padding-left: 16px; }
 }
+.gis-slot { min-height: 44px; display: flex; justify-content: center; color-scheme: light; }
