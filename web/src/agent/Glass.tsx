@@ -236,6 +236,8 @@ export function Glass() {
   const [up, setUp] = useState(false);
   const [wiping, setWiping] = useState(false);
   const [freshId, setFreshId] = useState<number | null>(null);
+  // Earlier drawings shrink into a stack so the code behind the glass stays visible; the student can open one again.
+  const [openId, setOpenId] = useState<number | null>(null);
   const [mark, setMark] = useState<CodeMark | null>(null);
   // The glass shows one layer at a time: Senior's drawings, or its marks on the student's code
   // (with the pane clear, so the code underneath stays sharp and editable).
@@ -254,7 +256,7 @@ export function Glass() {
   const raise = useCallback((id: number | null) => {
     setUp(true);
     setActivity((n) => n + 1);
-    if (id !== null) setFreshId(id);
+    if (id !== null) { setFreshId(id); setOpenId(null); }
   }, []);
 
   const wipe = useCallback(() => {
@@ -449,14 +451,22 @@ export function Glass() {
         )}
         <div className={`gb-board ${wiping ? "wiping" : ""} ${onCode ? "away" : ""}`}>
           <div className="gb-flow">
-            {items.map((item, i) => (
-              <figure key={item.id} ref={i === items.length - 1 ? newest : undefined} data-kind={item.kind}
-                className={`gb-item ${item.id === freshId ? "fresh" : ""}`}>
-                <span className="gb-order" aria-hidden="true">{i + 1}</span>
-                <Drawing item={item} />
-                {"caption" in item && item.caption && <figcaption className="gb-cap write-line" style={after(700)}>{item.caption}</figcaption>}
-              </figure>
-            ))}
+            {items.map((item, i) => {
+              const small = i < items.length - 1 && item.id !== openId;
+              const open = () => { setOpenId(item.id); setActivity((n) => n + 1); };
+              return (
+                <figure key={item.id} ref={i === items.length - 1 ? newest : undefined} data-kind={item.kind}
+                  className={`gb-item ${item.id === freshId ? "fresh" : ""} ${small ? "older" : ""}`}
+                  {...(small ? { role: "button", tabIndex: 0, "aria-label": `Drawing ${i + 1}: ${describe(item)} Open it.`, onClick: open,
+                    onKeyDown: (event: { key: string; preventDefault: () => void }) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); open(); } } } : {})}>
+                  <span className="gb-order" aria-hidden="true">{i + 1}</span>
+                  <div className="gb-body" {...(small ? ({ inert: "" } as Record<string, string>) : {})}>
+                    <Drawing item={item} />
+                    {"caption" in item && item.caption && <figcaption className="gb-cap write-line" style={after(700)}>{item.caption}</figcaption>}
+                  </div>
+                </figure>
+              );
+            })}
           </div>
         </div>
       </div>
