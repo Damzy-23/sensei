@@ -34,3 +34,10 @@ def test_logs_endpoint_filters_by_actor() -> None:
     actor = body["events"][0]["actor"]
     filtered = client.get("/logs", params={"actor": actor}).json()["events"]
     assert filtered and all(e["actor"] == actor for e in filtered)
+
+
+def test_mentor_messages_route_exists_for_a_session() -> None:
+    client = TestClient(app)
+    session_id = client.post("/sessions", json={"mode": "learn"}).json()["session_id"]
+    assert client.get(f"/sessions/{session_id}/mentor-messages").status_code == 200
+    assert client.get("/sessions/ses_missing/mentor-messages").status_code == 404

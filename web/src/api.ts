@@ -67,6 +67,7 @@ export const getTrack = (trackId: string) => request<Track>(`/tracks/${trackId}`
 export const getProblem = (problemId: string) => request<ProblemDetail>(`/problems/${problemId}`);
 export const getTrace = (traceId: string) => request<TraceTree>(`/traces/${traceId}`);
 export const listTickets = () => request<Ticket[]>("/mentor/tickets");
+export const getMentorMessages = (sessionId: string) => request<ChatMessage[]>(`/sessions/${sessionId}/mentor-messages`);
 export const getTicket = (ticketId: string) => request<TicketDetail>(`/mentor/tickets/${ticketId}`);
 export const replyTicket = (ticketId: string, text: string) => post<ChatMessage>(`/mentor/tickets/${ticketId}/reply`, { text });
 export const startVoiceSession = () => post<{ signed_url: string; agent_id: string }>("/voice/session");

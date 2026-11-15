@@ -16,7 +16,7 @@ from app import catalog, stubs
 from app.api.sse import sse
 from app.config import get_settings
 from app.memory import repository as memory
-from app.models import FinalEvent, MessageIn, RunIn, RunOut, SessionCreated, SessionCreateIn, SessionState
+from app.models import ChatMessage, FinalEvent, MessageIn, RunIn, RunOut, SessionCreated, SessionCreateIn, SessionState
 from app.orchestrator import turn as orchestrator
 from app.tracing import store
 
@@ -95,6 +95,15 @@ async def get_state(session_id: str) -> SessionState:
     if _stubbed():
         return stubs.stub_state(session_id)
     return orchestrator.state(memory.get_session(session_id))  # type: ignore[arg-type]
+
+
+@router.get("/{session_id}/mentor-messages", response_model=list[ChatMessage])
+async def mentor_messages(session_id: str) -> list[ChatMessage]:
+    """Replies a human mentor has sent into this session, oldest first. The student's chat polls this."""
+    _require_session(session_id)
+    if _stubbed():
+        return []
+    return [m for m in memory.transcript(session_id, limit=200) if m.actor == "mentor"]
 
 
 @router.get("/{session_id}/events")

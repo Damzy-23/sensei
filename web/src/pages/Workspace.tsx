@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  ApiError, getProblem, getState, getTrace, getTrack, postRun, sendMessage,
+  ApiError, getMentorMessages, getProblem, getState, getTrace, getTrack, postRun, sendMessage,
   type Mode, type Problem, type ProblemDetail, type SessionState, type TraceNode,
 } from "../api";
 import { registerTool, type PageSnapshot } from "../agent/tools";
@@ -9,7 +9,7 @@ import { entryPoint, runCode, runTests, type TestResult } from "../runner";
 import { CodeEditor, RichText } from "../components/CodeEditor";
 import { patternName } from "../labels";
 
-type Bubble = { id: number; kind: "student" | "coach" | "notice"; text: string; meta?: string };
+type Bubble = { id: number; kind: "student" | "coach" | "mentor" | "notice"; text: string; meta?: string };
 
 // What each rung allows; mirrors app/prompts/hint_coach.md.
 const LADDER = [
@@ -89,6 +89,23 @@ export function Workspace() {
   const refresh = useCallback(async () => {
     if (sessionId) setSession(await getState(sessionId));
   }, [sessionId]);
+
+  // Once a mentor has the session, show their replies in this chat as they arrive.
+  const seenMentor = useRef(new Set<string>());
+  useEffect(() => { seenMentor.current = new Set(); }, [sessionId]);
+  useEffect(() => {
+    if (!sessionId || !session?.escalated) return;
+    const poll = () => getMentorMessages(sessionId).then((list) => {
+      for (const m of list) {
+        if (seenMentor.current.has(m.id)) continue;
+        seenMentor.current.add(m.id);
+        say("mentor", m.text, "Mentor · a person");
+      }
+    }, () => undefined);
+    poll();
+    const timer = setInterval(poll, 3000);
+    return () => clearInterval(timer);
+  }, [sessionId, session?.escalated, say]);
 
   // Blitz countdown: re-read the server's clock rather than keeping a second one here.
   useEffect(() => {
