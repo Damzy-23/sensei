@@ -40,6 +40,8 @@ flowchart LR
     E -->|no| R[reply]
     H -->|reply| S
     R --> S
+    R -. learn only, after the reply .-> IL[illustrator]
+    IL --> GD[guard: drawing check] -->|one picture| GL[the glass]
     O -. every step .-> TR[(tracing)]
     TR -. live SSE .-> INS[Agent inspector]
 ```
@@ -48,15 +50,28 @@ The planner picks the next problem from mastery and the evaluator scores a
 finished attempt. Both are called by the orchestrator in the same way. Agents
 never call each other.
 
+**A picture with every explanation.** When the hint coach has answered, the
+orchestrator sends the reply (`final`) and only then calls the `illustrator`
+(`app/agents/illustrator.py`, role in `app/prompts/illustrator.md`). It runs on
+the fast model with a small token budget and an 8 second limit, and is given
+the problem's title and pattern, the hint level, the student's message and
+code, and the reply in words (a line of code the coach gave is left out). It returns one drawing spec or "none". The drawing guard
+(`app/guards/drawing.py`) checks it by rule, and what passes goes out as a
+`drawing` event on the same stream. The browser draws it through the page
+tools, so the same thing happens in typed chat and in a voice call, where
+`ask_coach` reports it as `drew`. The illustrator's steps are in the turn's
+own trace, after `turn.end`. It can only add to a turn: slow, failing or
+blocked, the student has already had their reply and simply gets no picture.
+
 ## The six building blocks
 
 | Block | What it means here | Where | Status |
 |---|---|---|---|
-| **Role-playing** | Specialists with one role each: `hint_coach` (Socratic hints at levels 1–5), `interviewer`, `caller` (a spoken interview), `observer` (the silent second interviewer), `evaluator` (end-of-interview feedback), `cv_writer`, `job_analyst`. One more role, `mentor`, is a human. | `app/agents/`, `app/prompts/` (one versioned file per role) | Built, except `planner` |
+| **Role-playing** | Specialists with one role each: `hint_coach` (Socratic hints at levels 1–5), `interviewer`, `caller` (a spoken interview), `observer` (the silent second interviewer), `illustrator` (one picture for the glass after each hint), `evaluator` (end-of-interview feedback), `cv_writer`, `job_analyst`. One more role, `mentor`, is a human. | `app/agents/`, `app/prompts/` (one versioned file per role) | Built, except `planner` |
 | **Focus** | The mode decision picks which agent may act. The hint ladder caps what the coach may reveal. Each agent gets only the context its job needs. Fast model for guards, reasoning model for agents. | `app/orchestrator/rules.py`, `app/agents/context.py` | Built |
 | **Tools** | Typed calls: read problem and visible tests, read the latest run, update mastery, escalate to mentor. Escalation is a tool, so human-in-the-loop is a traced call. | `app/tools/` | `escalate_to_mentor` and `update_mastery` built |
 | **Cooperation** | Supervisor pattern: the orchestrator hands each turn to exactly one specialist and escalates to a human on fixed triggers. | `app/orchestrator/turn.py`, `app/api/mentor.py` | Built |
-| **Guardrails** | Input classification, output leak check with rewrite, escalation policy, request validation, no solutions or hidden tests from any endpoint, secret redaction in logs. | `app/guards/`, `app/models.py`, `app/tracing/redact.py` | Built. The leak check is rule-based |
+| **Guardrails** | Input classification, output leak check with rewrite, a rule check on every drawing, escalation policy, request validation, no solutions or hidden tests from any endpoint, secret redaction in logs. | `app/guards/`, `app/models.py`, `app/tracing/redact.py` | Built. The leak check is rule-based |
 | **Memory** | Short-term: session state and transcript. Long-term: mastery per pattern. One repository interface over the store. | `app/memory/repository.py`, `app/db.py` | Built on SQLite. Mastery is per session until accounts exist |
 
 ### Memory, by type

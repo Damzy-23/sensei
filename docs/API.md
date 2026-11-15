@@ -53,7 +53,8 @@ Request:
 }
 ```
 
-Response is `text/event-stream`. Two kinds of event:
+Response is `text/event-stream`. The events, in order: `trace` (many), `final` (one), then in
+learn mode a few more `trace` events and at most one `drawing`.
 
 **`event: trace`**: one per agent/tool/guard step, as it happens. `data` is a `TraceEvent`:
 ```
@@ -62,14 +63,42 @@ data: {"event_id":"evt_0002","trace_id":"trc_stub_0001","span_id":"spn_guard","p
 
 ```
 
-**`event: final`**: exactly one, always last on success:
+**`event: final`**: exactly one on success, sent the moment the reply is ready. Show it at once:
+nothing that follows changes it.
 ```
 event: final
 data: {"reply":"Good start. Try writing down what you need to know about each number as you scan the list.","mode":"learn","hint_level":1,"escalated":false,"trace_id":"trc_stub_0001"}
 
 ```
 
+**`event: drawing`**: at most one, after `final`, on the same stream. A picture for the glass that
+goes with the reply, made by the illustrator without being asked. Only a hint coach reply gets
+one (learn mode; not a blocked message, not the note that a mentor is taking over). The
+illustrator's `trace` events come between `final` and `drawing`, in the same trace as the reply.
+If it has nothing to draw, fails, takes longer than 8 seconds or its drawing is blocked, the
+stream closes after `final` with no `drawing` and no `error`: the trace says why.
+```
+event: drawing
+data: {"kind":"array","values":["2","7","11","15"],"pointers":"0:start","water":"","highlight":"","edges":"","title":"","caption":"One pass over the example list, one number at a time."}
+
+```
+| Field | Meaning |
+|---|---|
+| `kind` | `array`, `bars`, `grid`, `tree`, `graph` or `steps` |
+| `values` | `array`, `bars`: the cells (at most 16). `grid`: one string per row, like `1,1,0` (at most 8 rows of 12). `tree`: level order, `null` for a gap (at most 31). `graph`: one label per node (at most 31). `steps`: one step each, in words (at most 6) |
+| `pointers` | `array`, `bars`: labels by index, like `0:left,4:right` |
+| `water` | `bars`: water between two indices, like `1-8` |
+| `highlight` | Indices to light up, like `2,3`; for `grid`, row:column pairs like `0:1` |
+| `edges` | `graph`: edges by node index, like `0-1,1-2` |
+| `title` | `steps` only: a short heading |
+| `caption` | One short sentence, at most 160 characters |
+
+Every text field is always present; one a kind does not use is an empty string. The formats are
+the ones the page tools `glass_array`, `glass_steps` and `glass_3d` take. A drawing never
+contains code.
+
 **`event: error`** (Phase 3+): `data: {"message": "...", "trace_id": "..."}`. Stream ends after it.
+It can only come before `final`, never after.
 
 Each event is `event: <name>` line, `data: <json>` line, blank line.
 
@@ -322,7 +351,9 @@ response shapes are in the interactive docs at `/docs` (generated from the code)
 
 Trace events are written when a span finishes, so the root node of a trace tree carries the
 `turn.end` event, with the turn's total latency. Actors also include `caller`, `observer`,
-`job_analyst`, `cv_writer` and the career agent.
+`illustrator`, `job_analyst`, `cv_writer` and the career agent. The illustrator's events are
+numbered after `turn.end`, because it works after the reply has been sent; the turn's latency
+does not include it.
 
 ---
 
