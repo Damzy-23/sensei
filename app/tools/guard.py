@@ -12,7 +12,14 @@ from app.guards.input import (
     parse_classification,
     regex_rules,
 )
-from app.llm.client import call
+from app.guards.output import (
+    JUDGE_SCHEMA,
+    judge_messages,
+    parse_judge,
+    policy_verdict,
+    static_checks,
+)
+from app.llm.client import LLMError, call
 from app.policy import load_policy
 from app.tracing.context import current_span
 from app.tracing.registry import tool
@@ -39,7 +46,6 @@ async def classify_input(session_id: str, text: str, regex_category: str | None)
     """Fast-model classifier. Skipped when the regex already found an injection."""
     st = current_span()
     min_conf = load_policy().guard.classify_min_confidence
-    hit = regex_rules(text) if regex_category == "injection" else None
 
     model_category = None
     model_conf = 0.0
@@ -49,11 +55,8 @@ async def classify_input(session_id: str, text: str, regex_category: str | None)
                            json_schema=CLASSIFY_SCHEMA, max_tokens=60)
         model_category, model_conf = parse_classification(reply.data)
 
-    # The regex result arrives from regex_precheck. An injection from there is trusted as-is.
-    if regex_category == "injection" and hit is None:
-        regex_hit: RegexHit | None = RegexHit("injection", "regex_precheck", text[:40])
-    else:
-        regex_hit = hit
+    # An injection found by regex_precheck is trusted without a second check.
+    regex_hit = RegexHit("injection", "regex_precheck", text[:40]) if regex_category == "injection" else regex_rules(text)
     verdict = decide_input(regex_hit, model_category, model_conf, min_conf)
     if st is not None:
         st.decision = verdict.decision
@@ -63,11 +66,44 @@ async def classify_input(session_id: str, text: str, regex_category: str | None)
 
 @tool("guard", "leak_check", "guard.output")
 async def leak_check(reply: str, level: int, reference_solution: str) -> dict[str, Any]:
-    """Code-block rules per level, similarity to the reference, and a model judge."""
-    raise NotImplementedError("leak_check: built in Phase 4 (output guard)")
+    """Code-block rules per level, similarity to the reference, and a model judge (fail closed)."""
+    st = current_span()
+    policy = load_policy()
+    static = static_checks(
+        reply, level, reference_solution,
+        similarity_threshold=policy.guard.similarity_threshold,
+        pseudocode_max_lines=policy.hint_ladder.pseudocode_max_lines,
+    )
+    if not static.ok:
+        result = {"decision": "block", "reason": static.reason, "checks": {"static": False, "similarity": static.similarity}}
+    else:
+        try:
+            judged = await call("fast", "You audit coaching hints for leaked solutions. Reply with JSON only.",
+                                judge_messages(reply, reference_solution), actor="guard", name="llm_judge",
+                                json_schema=JUDGE_SCHEMA, max_tokens=60)
+            leaks = parse_judge(judged.data)
+            reason = "judge: reveals full solution" if leaks else "judge: no full solution revealed"
+        except LLMError as exc:
+            leaks = True
+            reason = f"judge unavailable, failing closed: {exc}"
+        if leaks:
+            result = {"decision": "block", "reason": reason, "checks": {"static": True, "judge_leak": True}}
+        else:
+            result = {"decision": "pass", "reason": "static checks and judge passed",
+                      "checks": {"static": True, "judge_leak": False, "similarity": static.similarity}}
+    if st is not None:
+        st.decision = result["decision"]
+        st.reason = result["reason"]
+    return result
 
 
 @tool("guard", "policy_check", "guard.output")
-def policy_check(reply: str, level: int) -> dict[str, Any]:
-    """Length limit and that the reply matches the unlocked hint level."""
-    raise NotImplementedError("policy_check: built in Phase 4 (output guard)")
+def policy_check(reply: dict[str, Any], level: int) -> dict[str, Any]:
+    """Length limit, non-empty hint, and that the reply's level matches the unlocked level."""
+    st = current_span()
+    ok, reason = policy_verdict(reply, level, load_policy().hint_ladder.reply_max_words)
+    result = {"decision": "pass" if ok else "block", "reason": reason}
+    if st is not None:
+        st.decision = result["decision"]
+        st.reason = result["reason"]
+    return result
