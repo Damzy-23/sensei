@@ -8,7 +8,9 @@ turn loop runs against a scripted model, so the events and tickets are genuine o
 from __future__ import annotations
 
 import json
+import re
 import time
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -21,8 +23,21 @@ from app.llm.gateway import LLMResult
 from app.main import app
 from app.tracing import archive
 
-MENTOR = {"authorization": "Bearer mentor-token"}
 TOTALS_KEYS = {"events", "model_calls", "tool_calls", "cost_usd"}
+WEB = Path(__file__).resolve().parent.parent / "web" / "src"
+
+
+def _token(name: str) -> str:
+    """A token shaped like a Firebase ID token: three parts joined by dots. Only the shape is
+    real. `_sign_in` decides which names verify."""
+    return f"header.{name}.signature"
+
+
+def _bearer(name: str) -> dict[str, str]:
+    return {"authorization": f"Bearer {_token(name)}"}
+
+
+MENTOR = _bearer("mentor-token")
 
 
 class FrustratedStudentModel:
@@ -81,8 +96,10 @@ def _escalated_session(client: TestClient, secret: str) -> str:
     return sid
 
 
-def _sign_in(monkeypatch, tokens: dict[str, dict], mentors: str = "Lead@Example.com, second@example.com") -> None:
-    """Stand in for Google: only the listed tokens verify, each with the claims given."""
+def _sign_in(monkeypatch, names: dict[str, dict], mentors: str = "Lead@Example.com, second@example.com") -> None:
+    """Stand in for Google: only the tokens of the listed names verify, each with the claims given."""
+    tokens = {_token(name): claims for name, claims in names.items()}
+
     def verify(token: str, request: object, audience: str | None = None) -> dict:
         if token not in tokens:
             raise ValueError("Could not verify token signature.")
@@ -230,7 +247,7 @@ def test_a_mentor_sees_every_session(client: TestClient, monkeypatch) -> None:
 def test_the_token_can_come_in_the_query_string(client: TestClient, monkeypatch) -> None:
     _escalated_session(client, "zebra-orchid")
     _sign_in(monkeypatch, {"mentor-token": {"email": "lead@example.com", "email_verified": True}})
-    assert client.get("/logs", params={"token": "mentor-token"}).json()["scope"] == "all"
+    assert client.get("/logs", params={"token": _token("mentor-token")}).json()["scope"] == "all"
 
 
 def test_an_unverified_email_on_the_list_is_not_a_mentor(client: TestClient, monkeypatch) -> None:
@@ -242,12 +259,12 @@ def test_an_unverified_email_on_the_list_is_not_a_mentor(client: TestClient, mon
         "stranger": {"email": "someone@elsewhere.org", "email_verified": True},
     })
     for token in ("unverified", "no-flag", "stranger"):
-        headers = {"authorization": f"Bearer {token}"}
+        headers = _bearer(token)
         body = client.get("/logs", headers=headers).json()
         assert body["scope"] == "own" and body["events"] == []
         assert client.get("/mentor/tickets", headers=headers).json() == []
     # Signed in, but not a mentor: still sees the sessions this browser holds, like a guest.
-    own = client.get("/logs", headers={"authorization": "Bearer stranger", **_holding(mine)}).json()["events"]
+    own = client.get("/logs", headers={**_bearer("stranger"), **_holding(mine)}).json()["events"]
     assert own and {e["session_id"] for e in own} == {mine}
 
 
@@ -260,21 +277,78 @@ def test_no_mentor_list_means_no_mentors(client: TestClient, monkeypatch) -> Non
 def test_an_invalid_token_is_refused_but_a_guest_is_not(client: TestClient, monkeypatch) -> None:
     _sign_in(monkeypatch, {"mentor-token": {"email": "lead@example.com", "email_verified": True}})
     for path in ("/logs", "/mentor/tickets", "/tracks"):
-        assert client.get(path, headers={"authorization": "Bearer forged"}).status_code == 401
-        assert client.get(path, params={"token": "forged"}).status_code == 401
+        assert client.get(path, headers=_bearer("forged")).status_code == 401
+        assert client.get(path, params={"token": _token("forged")}).status_code == 401
         assert client.get(path).status_code == 200  # no token: a guest, not an error
     # A token that had verified is refused once it has expired.
     expired = {"email": "lead@example.com", "email_verified": True, "exp": time.time() - 1}
     _sign_in(monkeypatch, {"old-token": expired})
-    assert client.get("/logs", headers={"authorization": "Bearer old-token"}).json()["scope"] == "all"
+    assert client.get("/logs", headers=_bearer("old-token")).json()["scope"] == "all"
     monkeypatch.setattr(auth.id_token, "verify_firebase_token", lambda *a, **k: (_ for _ in ()).throw(ValueError("Token expired")))
-    assert client.get("/logs", headers={"authorization": "Bearer old-token"}).status_code == 401
+    assert client.get("/logs", headers=_bearer("old-token")).status_code == 401
 
 
 def test_a_token_is_ignored_when_no_project_can_verify_it(client: TestClient) -> None:
     mine = _escalated_session(client, "zebra-orchid")
     body = client.get("/logs", headers={"authorization": "Bearer anything", **_holding(mine)}).json()
     assert body["scope"] == "own" and {e["session_id"] for e in body["events"]} == {mine}
+
+
+def test_a_bad_token_does_not_send_the_server_to_google_each_time(client: TestClient, monkeypatch) -> None:
+    # google-auth fetches the signing certificates before it reads a token. Anyone can send a
+    # token, so that fetch must not happen once for every bad one.
+    fetched: list[str] = []
+
+    def fetch(url: str, method: str = "GET", **kwargs: object) -> SimpleNamespace:
+        fetched.append(url)
+        return SimpleNamespace(status=200, data=json.dumps({"key-1": "not a certificate"}).encode())
+
+    keeper = auth._KeepsCertificates(fetch)
+    monkeypatch.setenv("SENSEI_AUTH_PROJECT", "example-project")
+    monkeypatch.setattr(auth, "_transport", lambda: keeper)
+
+    # Not shaped like a token at all: refused without asking for anything.
+    for junk in ("forged", "two.parts", "four.parts.in.all", "empty..part", "a space.in.it", "x" * 5000):
+        assert client.get("/logs", headers={"authorization": f"Bearer {junk}"}).status_code == 401
+        assert client.get("/logs", params={"token": junk}).status_code == 401
+    assert fetched == []
+
+    # Shaped like one, and forged: the real verifier runs, on certificates fetched once.
+    for n in range(25):
+        assert client.get("/logs", headers=_bearer(f"forged-{n}")).status_code == 401
+    assert client.get("/logs", headers=_bearer("forged-0")).status_code == 401
+    assert len(fetched) == 1
+    assert client.get("/logs").status_code == 200 and len(fetched) == 1  # a guest costs no fetch
+
+    # Kept, not kept for ever: the certificates are fetched again once their time is up.
+    brief = auth._KeepsCertificates(fetch, keep_s=0)
+    monkeypatch.setattr(auth, "_transport", lambda: brief)
+    for n in range(2):
+        assert client.get("/logs", headers=_bearer(f"forged-{n}")).status_code == 401
+    assert len(fetched) == 3
+
+
+def test_a_failed_certificate_fetch_is_neither_repeated_at_once_nor_kept_for_long() -> None:
+    asked: list[dict] = []
+
+    def fetch(url: str, method: str = "GET", **kwargs: object) -> SimpleNamespace:
+        asked.append(kwargs)
+        if len(asked) == 2:
+            raise ConnectionError("no answer from Google")
+        return SimpleNamespace(status=503 if len(asked) == 1 else 200, data=b"{}")
+
+    # While Google is failing, the callers are told so without each of them asking it again.
+    patient = auth._KeepsCertificates(fetch)
+    assert [patient("https://certs.example").status for _ in range(3)] == [503, 503, 503] and len(asked) == 1
+    assert asked[0]["timeout"] == auth.CERTS_TIMEOUT_S
+
+    # Once the pause is over it is asked again, and only a good answer is kept.
+    asked.clear()
+    keeper = auth._KeepsCertificates(fetch, retry_s=0)
+    assert keeper("https://certs.example").status == 503
+    with pytest.raises(ConnectionError):
+        keeper("https://certs.example")
+    assert [keeper("https://certs.example").status for _ in range(3)] == [200, 200, 200] and len(asked) == 3
 
 
 # ---------- the whole system's totals ----------
@@ -415,3 +489,31 @@ def test_with_the_switch_off_an_auth_project_still_means_everyone_signs_in(unsco
     monkeypatch.setenv("SENSEI_AUTH_PROJECT", "example-project")
     assert unscoped.get("/logs").status_code == 401
     assert unscoped.get("/mentor/tickets").status_code == 401
+
+
+# ---------- the screens ----------
+
+
+def test_no_screen_prints_a_whole_session_or_trace_id() -> None:
+    # A session id is the key to its session, and GET /traces/{trace_id} answers with the
+    # session id. Whoever can see a screen (a projector, a screen share, a photo) must not be
+    # able to read either one off it, so a screen shows idTag(id): its last four characters.
+    # This reads the pages as written. Two ways of putting an id on screen are refused:
+    # an id in text ({ticket.session_id}, or `trace ${trace_id}` in a message), and an event
+    # dumped as JSON without going through printable(), which tags its ids.
+    in_text = re.compile(r"(?<!=)\{\s*[\w.?]*(?:session_id|trace_id|sessionId|traceId)\s*\}(?!\s*=)")
+    raw_dump = re.compile(r"\{\s*JSON\.stringify\((?!printable\()")
+    pages = sorted(WEB.rglob("*.tsx"))
+    assert len(pages) >= 10  # guards against passing because nothing was read
+    offenders = [
+        f"{page.relative_to(WEB)}:{number}: {line.strip()}"
+        for page in pages
+        for number, line in enumerate(page.read_text().splitlines(), 1)
+        if in_text.search(line) or raw_dump.search(line)
+    ]
+    assert offenders == [], "a whole id is printed; show idTag(id) or printable(event) instead:\n" + "\n".join(offenders)
+    # The check does catch what it is for.
+    assert in_text.search("<span>{detail.session_id}</span>") and in_text.search("session {e.session_id} · trace {e.trace_id}")
+    assert in_text.search("` (trace ${inner.trace_id})`") and raw_dump.search("<pre>{JSON.stringify(selected, null, 2)}</pre>")
+    assert not in_text.search("<Row key={e.trace_id} sessionId={sessionId} />") and not in_text.search("const { sessionId } = useApp();")
+    assert not in_text.search("session {idTag(e.session_id)}") and not raw_dump.search("{JSON.stringify(printable(selected), null, 2)}")

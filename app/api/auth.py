@@ -19,9 +19,12 @@ from __future__ import annotations
 
 import os
 import re
+import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from functools import lru_cache
+from typing import Any
 
 from fastapi import HTTPException, Request
 from google.auth.transport import requests as google_requests
@@ -33,10 +36,17 @@ MAX_SESSIONS = 30  # also the most values Firestore takes in one `in` filter
 # dropped, so shared trace buckets such as "cv" and "offline" can never be claimed.
 _SESSION_ID = re.compile(r"ses_(?:[0-9a-f]{12}|demo_\d{4})")
 
-# Verified tokens, kept until they expire: checking one costs a request to Google for its
-# signing keys, and a signed-in page sends the same token every few seconds.
+# A Firebase ID token is a JWT: three base64url parts joined by dots. Anything else is refused
+# before the verifier is asked.
+_TOKEN_SHAPE = re.compile(r"[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
+
+# Verified tokens, kept until they expire: a signed-in page sends the same token every few seconds.
 _VERIFIED: dict[tuple[str, str], dict] = {}
 _VERIFIED_MAX = 512
+
+CERTS_KEPT_S = 3600.0
+CERTS_RETRY_S = 30.0
+CERTS_TIMEOUT_S = 10
 
 
 @dataclass(frozen=True)
@@ -57,9 +67,42 @@ class Viewer:
         return self.sees_all or session_id in self.sessions
 
 
+class _KeepsCertificates:
+    """The transport handed to google-auth, which fetches Google's signing certificates anew for
+    every token it checks, before it has even read the token. Anyone can send a token, so
+    without this each bad one would cost a call to Google. A fetched answer is kept for an
+    hour: Google publishes a new certificate well before it signs with it, so an hour-old set
+    still verifies every live token. One fetch runs at a time and gives up after ten seconds.
+    If it fails, the callers are told at once for the next half minute, then Google is asked again."""
+
+    def __init__(self, fetch: Callable[..., Any], keep_s: float = CERTS_KEPT_S, retry_s: float = CERTS_RETRY_S) -> None:
+        self._fetch, self._keep_s, self._retry_s = fetch, keep_s, retry_s
+        self._kept: dict[str, tuple[float, Any]] = {}  # url -> (good until, the answer or the error)
+        self._lock = threading.Lock()
+
+    def __call__(self, url: str, method: str = "GET", **kwargs: Any) -> Any:
+        kwargs.setdefault("timeout", CERTS_TIMEOUT_S)
+        if method != "GET":
+            return self._fetch(url, method=method, **kwargs)
+        with self._lock:
+            kept = self._kept.get(url)
+            if kept is None or kept[0] <= time.monotonic():
+                kept = self._kept[url] = self._ask(url, kwargs)
+        if isinstance(kept[1], Exception):
+            raise kept[1]
+        return kept[1]
+
+    def _ask(self, url: str, kwargs: dict[str, Any]) -> tuple[float, Any]:
+        try:
+            answer = self._fetch(url, method="GET", **kwargs)
+        except Exception as exc:  # noqa: BLE001  Google could not be reached
+            return time.monotonic() + self._retry_s, exc
+        return time.monotonic() + (self._keep_s if answer.status == 200 else self._retry_s), answer
+
+
 @lru_cache(maxsize=1)
-def _transport() -> google_requests.Request:
-    return google_requests.Request()
+def _transport() -> _KeepsCertificates:
+    return _KeepsCertificates(google_requests.Request())
 
 
 def auth_project() -> str | None:
@@ -88,6 +131,8 @@ def parse_sessions(header: str | None) -> tuple[str, ...]:
 
 def verify_token(token: str, project: str) -> dict:
     """The claims of a valid Firebase ID token for this project. Raises if it is not one."""
+    if not _TOKEN_SHAPE.fullmatch(token):
+        raise ValueError("not a sign-in token")
     cached = _VERIFIED.get((project, token))
     if cached is not None and cached.get("exp", 0) > time.time():
         return cached

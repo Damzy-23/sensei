@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { getQueueScope, getTicket, listTickets, replyTicket, resolveTicket, type Ticket, type TicketDetail } from "../api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { getQueueScope, getTicket, idTag, listTickets, replyTicket, resolveTicket, type Ticket, type TicketDetail } from "../api";
 
 const REFRESH_MS = 5000;
 
@@ -27,24 +27,36 @@ export function Mentor() {
   // "own" when the API shows this viewer only the tickets of their own sessions. Unknown stays silent.
   const [scope, setScope] = useState<"all" | "own" | null>(null);
 
-  const loadList = useCallback(async () => {
+  // The ticket on screen, for answers that arrive after the selection has moved on.
+  const selectedRef = useRef<string | null>(null);
+
+  /** Loads the queue and returns it, or null if it could not be loaded. */
+  const loadList = useCallback(async (): Promise<Ticket[] | null> => {
     try {
       const next = await listTickets();
       setTickets(next);
       setListError(null);
-      setSelectedId((current) => current ?? next.find((t) => t.status === "open")?.id ?? next[0]?.id ?? null);
+      // Keep the selection only while its ticket is listed. A ticket leaves a visitor's queue
+      // when this browser no longer holds its session, and the Session panel must not go on
+      // showing a ticket the queue says is not there.
+      setSelectedId((current) => (current !== null && next.some((t) => t.id === current)
+        ? current
+        : next.find((t) => t.status === "open")?.id ?? next[0]?.id ?? null));
+      return next;
     } catch (err) {
       setListError(`Could not load the queue: ${errorText(err)}`);
+      return null;
     }
   }, []);
 
   const loadDetail = useCallback(async (ticketId: string) => {
     try {
       const next = await getTicket(ticketId);
+      if (selectedRef.current !== ticketId) return;
       setDetail(next);
       setDetailError(null);
     } catch (err) {
-      setDetailError(`Could not load this session: ${errorText(err)}`);
+      if (selectedRef.current === ticketId) setDetailError(`Could not load this session: ${errorText(err)}`);
     }
   }, []);
 
@@ -61,6 +73,7 @@ export function Mentor() {
   }, []);
 
   useEffect(() => {
+    selectedRef.current = selectedId;
     setDetail(null);
     setDetailError(null);
     setActionError(null);
@@ -70,8 +83,8 @@ export function Mentor() {
 
   const refresh = async () => {
     setRefreshing(true);
-    await loadList();
-    if (selectedId) await loadDetail(selectedId);
+    const next = await loadList();
+    if (selectedId && next?.some((t) => t.id === selectedId)) await loadDetail(selectedId);
     setRefreshing(false);
   };
 
@@ -170,7 +183,7 @@ export function Mentor() {
               <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
                 <span className="mono" style={{ fontWeight: 500 }}>{detail.problem_id || "no problem recorded"}</span>
                 <StatusPill status={detail.status} />
-                <span className="dim mono" style={{ fontSize: 11 }}>{detail.session_id}</span>
+                <span className="dim mono" style={{ fontSize: 11 }}>session {idTag(detail.session_id)}</span>
               </div>
 
               <div>

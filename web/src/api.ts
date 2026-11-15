@@ -53,21 +53,32 @@ const SESSION_ID = /^ses_[0-9a-z_]{1,40}$/;
 let sessionsThisTab: string[] = []; // newest first; also the whole list when storage is unavailable
 
 /** Newest first, 30 at most. This tab's current session leads, so it is always sent; the list
- *  every tab shares follows, and it is in the order the sessions were started. */
+ *  every tab shares follows, and it is in the order the sessions were started. If the shared
+ *  list has lost one of this tab's sessions (site data was cleared, or other tabs started
+ *  thirty newer ones), it is written back here, so the other tabs see the session again. */
 function heldSessions(): string[] {
   let stored: string[] = [];
   try { stored = (localStorage.getItem(SESSIONS_KEY) ?? "").split(","); } catch { /* storage is blocked */ }
   const all = [...sessionsThisTab.slice(0, 1), ...stored, ...sessionsThisTab].filter((id) => SESSION_ID.test(id));
-  return [...new Set(all)].slice(0, MAX_SESSIONS);
+  const held = [...new Set(all)].slice(0, MAX_SESSIONS);
+  if (held.some((id) => !stored.includes(id))) {
+    try { localStorage.setItem(SESSIONS_KEY, held.join(",")); } catch { /* private window: this tab still remembers */ }
+  }
+  return held;
 }
 
 function rememberSession(sessionId: string): string {
   sessionsThisTab = [sessionId, ...sessionsThisTab].slice(0, MAX_SESSIONS);
-  // Read again just before writing: another tab may have added a session since.
-  const next = heldSessions();
-  try { localStorage.setItem(SESSIONS_KEY, next.join(",")); } catch { /* private window: this tab still remembers */ }
+  heldSessions(); // reads the shared list afresh, as another tab may have added to it, and writes the new id in
   return sessionId;
 }
+
+/** How an id is shown on screen. A session id is the key to its session, and a trace id leads
+ *  to one, so neither is ever printed whole: a shared screen or a photo of the page must not
+ *  hand a session to whoever is watching. The last four characters tell two rows apart. */
+export const idTag = (id: string): string => (id.length > 8 ? `…${id.slice(-4)}` : id);
+/** A trace event as it may be printed: every field, with the session and trace ids as tags. */
+export const printable = (event: TraceEvent): TraceEvent => ({ ...event, session_id: idTag(event.session_id), trace_id: idTag(event.trace_id) });
 
 /** Who is calling: the sign-in token, if any, and the sessions this browser holds. */
 export async function authHeaders(): Promise<Record<string, string>> {

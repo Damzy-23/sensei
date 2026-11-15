@@ -56,12 +56,23 @@ Nobody has to sign in. Every request is answered for a viewer: a guest, or a sig
 - **Routes keyed by an unguessable id are not scoped:** `/sessions/{session_id}/...` and
   `/traces/{trace_id}` answer whoever knows the id. No scoped route returns another session's
   session id, trace id or ticket id.
+- **An id is never shown whole.** Knowing a session id is the same as holding the session, and
+  `/traces/{trace_id}` answers with the session id. So the web app prints only the last four
+  characters of either (`…2e4b`): nobody can read a key off a shared screen or a screenshot.
 
 | Setting | Meaning |
 |---|---|
 | `SENSEI_SCOPE_DATA=1` | Switches the rules above on. Unset, every caller sees every session, as before: fine on your own machine, not on a public server. |
 | `SENSEI_MENTOR_EMAILS` | The mentors' emails, comma separated. Case does not matter. Empty means there are no mentors. |
 | `SENSEI_AUTH_PROJECT` | The Firebase project whose tokens are accepted. With scoping off it also makes every call need a sign-in, as before. |
+
+**Switching it on, on a server that is live.** The order matters:
+
+1. Set `SENSEI_SCOPE_DATA=1` first. The code from before scoping ignores it, and a deploy keeps it.
+2. Then deploy this code (merging to the deploy branch does it). Visitors now see only their own sessions.
+3. Only then set `SENSEI_AUTH_PROJECT` and `SENSEI_MENTOR_EMAILS`, both in one update. Never set
+   `SENSEI_AUTH_PROJECT` alone, or before steps 1 and 2 are live: with scoping off it puts every
+   call behind a sign-in, and every guest gets `401`.
 
 ---
 
