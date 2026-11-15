@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import { API_URL } from "../api";
+import { API_URL, authHeaders } from "../api";
 
 // Mirrors POST /cv/tailor (app/api/cv.py).
 interface Role { role: string; company: string; dates: string; bullets: string[] }
@@ -82,7 +82,7 @@ export function CvStudio() {
     setResult({ status: "busy" });
     try {
       const response = await fetch(`${API_URL}/cv/tailor`, {
-        method: "POST", headers: { "content-type": "application/json" },
+        method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) },
         body: JSON.stringify({ job_description: job, cv_text: cvText }),
       });
       if (!response.ok) { setResult({ status: "error", message: await readError(response) }); return; }

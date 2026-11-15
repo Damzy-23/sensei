@@ -44,7 +44,7 @@ export class ApiError extends Error {
   constructor(message: string, readonly status?: number, readonly traceId?: string) { super(message); }
 }
 
-async function authHeaders(): Promise<Record<string, string>> {
+export async function authHeaders(): Promise<Record<string, string>> {
   const token = await idToken();
   return token ? { authorization: `Bearer ${token}` } : {};
 }
