@@ -70,6 +70,11 @@ def session_exists(session_id: str) -> bool:
     return session_id in _SESSIONS
 
 
+def session_ids() -> list[str]:
+    """Every session started in this process, oldest first."""
+    return list(_SESSIONS)
+
+
 def stub_final(session_id: str) -> FinalEvent:
     return FinalEvent(
         reply=(
