@@ -1,0 +1,52 @@
+# Guardrail and mode policy. Read by app/policy.py. Change behaviour here, not in code.
+
+hint_ladder:
+  max_level: 5
+  # Unlock is also allowed once this many seconds pass since the last unlock (or problem start).
+  min_wait_seconds: 120
+  # Coach hint length limit (spec: max 60 words).
+  reply_max_words: 60
+  pseudocode_max_lines: 12
+  levels:
+    1: "Clarify the problem and its constraints. No code, no pattern names."
+    2: "Name the pattern family (for example hash map, sliding window). No code."
+    3: "One guiding question about the key insight. No code."
+    4: "The approach in words. No code."
+    5: "A pseudocode skeleton of at most 12 lines. Pseudocode is allowed only at this level."
+
+guard:
+  # Normalised similarity to the reference solution at or above this value blocks a reply.
+  similarity_threshold: 0.80
+  # Injection blocks counted per session before escalation.
+  violation_escalation_count: 3
+  # Frustration flags counted per session before escalation.
+  frustration_escalation_count: 2
+  # Classifier confidence below this is treated as "ok".
+  classify_min_confidence: 0.5
+
+# Safe hint used when the coach reply fails leak_check or policy_check twice. Never contains code.
+canned_hints:
+  1: "Start by restating what the problem asks for, and write down the input and output types."
+  2: "Think about which pattern family fits: does the problem involve looking things up, a sorted order, or a moving window?"
+  3: "What information would let you decide the answer for one position from answers you already have?"
+  4: "Describe in one sentence how you would walk through the input once, and what you would remember as you go."
+  5: "Write the steps as a short outline: set up the state, loop over the input, update the state, return the result."
+
+redirects:
+  answer_request: "I can't give you the full solution, but I can get you there in steps. Hints unlock one level at a time, after a failed run or a short wait. Want the next hint?"
+  off_topic: "I can only help with this interview problem. Which part of it are you working on?"
+  frustration: "Getting stuck on this is normal. Let's take it one small step at a time."
+  injection: "I can't change how I coach you. Let's get back to the problem."
+
+modes:
+  learn_consecutive_failed_runs: 3
+  learn_hint_level: 3
+  interview_min_mastery: 0.6
+  interview_max_hints_on_solve: 1
+  blitz_solves_in_row: 3
+  blitz_time_target_seconds: 600
+  blitz_countdown_seconds: 900
+
+escalation:
+  # Still failing after the hint at this level escalates to a mentor.
+  stuck_hint_level: 5
