@@ -206,3 +206,50 @@ def set_mastery(session_id: str, pattern: str, score: float) -> None:
         " ON CONFLICT (session_id, pattern) DO UPDATE SET score = excluded.score",
         (session_id, pattern, score),
     )
+
+
+# ---------- mentor tickets ----------
+
+
+def create_ticket(
+    session_id: str,
+    problem_id: str,
+    stuck_reason: str,
+    latest_code: str,
+    suggested_intervention: str,
+) -> str:
+    ticket_id = _id("tkt")
+    _execute(
+        "INSERT INTO tickets (id, session_id, problem_id, status, stuck_reason, latest_code,"
+        " suggested_intervention, created_at) VALUES (?, ?, ?, 'open', ?, ?, ?, ?)",
+        (ticket_id, session_id, problem_id, stuck_reason, latest_code, suggested_intervention, _now()),
+    )
+    return ticket_id
+
+
+def get_ticket_row(ticket_id: str) -> dict[str, Any] | None:
+    rows = _rows("SELECT * FROM tickets WHERE id = ?", (ticket_id,))
+    return rows[0] if rows else None
+
+
+def list_ticket_rows(status: str | None = None) -> list[dict[str, Any]]:
+    if status is None:
+        return _rows("SELECT * FROM tickets ORDER BY rowid DESC")
+    return _rows("SELECT * FROM tickets WHERE status = ? ORDER BY rowid DESC", (status,))
+
+
+def resolve_ticket_row(ticket_id: str) -> dict[str, Any] | None:
+    row = get_ticket_row(ticket_id)
+    if row is None:
+        return None
+    _execute("UPDATE tickets SET status = 'resolved' WHERE id = ?", (ticket_id,))
+    still_open = _rows(
+        "SELECT COUNT(*) AS n FROM tickets WHERE session_id = ? AND status = 'open'", (row["session_id"],)
+    )
+    if int(still_open[0]["n"]) == 0:
+        update_session(row["session_id"], escalated=False)
+    return get_ticket_row(ticket_id)
+
+
+def add_mentor_message(session_id: str, text: str) -> ChatMessage:
+    return add_message(session_id, "mentor", text)

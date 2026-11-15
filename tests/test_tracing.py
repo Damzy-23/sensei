@@ -239,9 +239,9 @@ def test_duplicate_registration_is_rejected() -> None:
 
 def test_tool_call_outside_implementation_is_traced_as_error() -> None:
     with turn("ses_reg") as tctx:
-        with pytest.raises(NotImplementedError):
-            orchestrator.select_mode({})
-    ev = next(e for e in _trace(tctx.trace_id) if e.name == "select_mode")
+        with pytest.raises(KeyError):
+            orchestrator.read_state("ses_missing")
+    ev = next(e for e in _trace(tctx.trace_id) if e.name == "read_state")
     assert ev.actor == "orchestrator"
     assert ev.status == "error"
 
@@ -249,8 +249,7 @@ def test_tool_call_outside_implementation_is_traced_as_error() -> None:
 def test_sync_tool_wrapper_preserves_name_and_is_traced() -> None:
     assert orchestrator.route_agent.__name__ == "route_agent"
     with turn("ses_reg2") as tctx:
-        with pytest.raises(NotImplementedError):
-            orchestrator.route_agent("learn", "hint")
+        assert orchestrator.route_agent("learn", "hint") == "hint_coach"
     assert any(e.name == "route_agent" and e.actor == "orchestrator" for e in _trace(tctx.trace_id))
     # A live sync tool is traced too, and its guard verdict carries decision and reason.
     with turn("ses_reg3") as tctx2:
