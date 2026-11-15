@@ -7,8 +7,8 @@
 //
 // Narration comes from the server (POST /voice/tts), which speaks in the voice of the coach
 // the student chose. All scenes are requested when the explainer opens, so there is no gap
-// between them. If a scene's audio cannot be fetched or played, that scene falls back to the
-// browser's built-in speech rather than playing in silence.
+// between them. Only the coach's voice is ever used: if a scene's audio cannot be fetched or
+// played, that scene shows its caption in silence for the time the narration would have taken.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_URL, authHeaders } from "../api";
@@ -64,7 +64,6 @@ export function Explainer() {
 
   const stopAudio = () => {
     window.clearTimeout(timer.current);
-    window.speechSynthesis?.cancel();
     playing.current?.pause();
     playing.current = null;
   };
@@ -95,9 +94,9 @@ export function Explainer() {
     return { playing: true as const, scenes: parsed.length, seconds: Math.round(parsed.reduce((sum, s) => sum + sceneSeconds(s.caption), 0)) };
   }), []);
 
-  // Play the current scene: speak its caption, then move on when the speech ends.
-  // The coach's voice is used when its audio arrived; otherwise the browser speaks the scene.
-  // A timer backs both up, so a scene can never hang if an "ended" event does not fire.
+  // Play the current scene: speak its caption in the coach's voice, then move on when it ends.
+  // If the audio is missing or will not play, the scene stays up, silent, for as long as the
+  // narration would have taken. A timer backs the audio up, so a scene can never hang.
   useEffect(() => {
     if (!show || paused || finished) return;
     const scene = show.scenes[index];
@@ -111,30 +110,22 @@ export function Explainer() {
         if (index + 1 < show.scenes.length) setIndex(index + 1); else setFinished(true);
       }, GAP_MS);
     };
-    const fallbackMs = sceneSeconds(scene.caption) * 1000;
-
-    const speakWithBrowser = () => {
+    const readingMs = sceneSeconds(scene.caption) * 1000;
+    const showSilently = () => {
       if (cancelled || moved) return;
-      const canSpeak = typeof window.speechSynthesis !== "undefined" && typeof SpeechSynthesisUtterance !== "undefined";
       window.clearTimeout(timer.current);
-      if (!canSpeak) { timer.current = window.setTimeout(next, fallbackMs); return; }
-      const speech = new SpeechSynthesisUtterance(scene.caption);
-      speech.onend = next;
-      speech.onerror = () => { timer.current = window.setTimeout(next, fallbackMs); };
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(speech);
-      timer.current = window.setTimeout(next, fallbackMs * 1.8 + 2000);
+      timer.current = window.setTimeout(next, readingMs);
     };
 
     void (narration.current[index] ?? Promise.resolve(null)).then((url) => {
       if (cancelled) return;
-      if (!url) { speakWithBrowser(); return; }
+      if (!url) { showSilently(); return; }
       const audio = new Audio(url);
       playing.current = audio;
       audio.onended = next;
-      audio.onerror = speakWithBrowser;
-      timer.current = window.setTimeout(next, fallbackMs * 1.8 + 4000);
-      audio.play().catch(speakWithBrowser);
+      audio.onerror = showSilently;
+      timer.current = window.setTimeout(next, readingMs * 1.8 + 4000);
+      audio.play().catch(showSilently);
     });
 
     return () => { cancelled = true; stopAudio(); };

@@ -290,3 +290,39 @@ def test_not_understanding_gets_a_second_explanation_at_the_same_level(client: T
     assert level["reason"].startswith("rule hint.reexplain")
     assert "did not understand your last message" in model.calls[-1][1]
     assert client.get(f"/sessions/{sid}/state").json()["hints_used"] == 1
+
+
+def test_a_resolved_ticket_does_not_re_escalate_on_the_next_message(client: TestClient, model: ScriptedModel) -> None:
+    model.category = "frustrated"
+    sid = _new(client)
+    assert [_send(client, sid, text="I give up")[-1][1]["escalated"] for _ in range(2)] == [False, True]
+    ticket = client.get("/mentor/tickets").json()[0]
+    client.post(f"/mentor/tickets/{ticket['id']}/resolve")
+
+    model.category = "ok"
+    after = _send(client, sid, text="OK, I'll try again. What does the second example show?")
+    assert after[-1][1]["escalated"] is False
+    assert len(client.get("/mentor/tickets").json()) == 1  # no second ticket for the same old signals
+
+    # Fresh frustration still escalates: it takes two new signals, not zero.
+    model.category = "frustrated"
+    assert [_send(client, sid, text="ugh")[-1][1]["escalated"] for _ in range(2)] == [False, True]
+    assert len(client.get("/mentor/tickets").json()) == 2
+
+
+def test_a_resolved_max_hint_ticket_needs_a_new_request_before_escalating_again(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client)
+    finals = [_send(client, sid)[-1][1] for _ in range(6)]
+    assert finals[-1]["escalated"] is True
+    ticket = client.get("/mentor/tickets").json()[0]
+    client.post(f"/mentor/tickets/{ticket['id']}/resolve")
+
+    # An ordinary message after the mentor has helped does not reopen it.
+    model.category = "ok"
+    assert _send(client, sid, text="Thanks, that helps. Let me try it.")[-1][1]["escalated"] is False
+    assert len(client.get("/mentor/tickets").json()) == 1
+
+    # Asking for help again at the top of the ladder does: there is no further hint to give.
+    model.category = "stuck"
+    assert _send(client, sid)[-1][1]["escalated"] is True
+    assert len(client.get("/mentor/tickets").json()) == 2

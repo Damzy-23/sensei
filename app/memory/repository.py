@@ -72,6 +72,16 @@ class Session:
             return 0
         return max(0, int((_now() - datetime.fromisoformat(self.problem_started_at)).total_seconds()))
 
+    def release_from_mentor(self) -> None:
+        """The mentor has dealt with it. Clear what triggered the escalation as well as the flag:
+        otherwise the counters are still over their limits and the very next message would
+        escalate again. The hint level stays where it was; hints_used drops back to it so
+        "still stuck after the last hint" needs a fresh request to fire."""
+        self.escalated = False
+        self.frustration_flags = 0
+        self.guard_violations = 0
+        self.hints_used = min(self.hints_used, self.hint_level)
+
     def start_problem(self, problem_id: str) -> None:
         """Switch problem: the hint ladder and run counters start again."""
         if self.problem_id == problem_id:

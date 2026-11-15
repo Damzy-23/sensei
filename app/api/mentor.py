@@ -51,6 +51,6 @@ async def resolve_ticket(ticket_id: str) -> Ticket:
     ticket = _found(memory.resolve_ticket(ticket_id))
     session = memory.get_session(ticket.session_id)
     if session is not None:
-        session.escalated = False
+        session.release_from_mentor()
         memory.save_session(session)
     return ticket

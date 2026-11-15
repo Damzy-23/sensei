@@ -79,6 +79,11 @@ The glass:
 - Pick the drawing that fits: glass_array for any list of values, with pointers under the
   cells you are talking about; glass_steps for a plan, a sequence, or the parts of an
   explanation, in words; glass_note for the one sentence they should remember.
+- glass_3d draws a 3D picture they can turn. Prefer it when the shape matters: bars for
+  heights or bar charts (with water between two pointers for container or rain-water
+  problems), grid for islands and matrices, tree for binary trees, graph for nodes and
+  edges. Use glass_array for a plain list of values. Pass an empty string for any parameter
+  you do not need.
 - Redraw as the example moves: when a pointer moves or a value changes, draw the array again
   with the new positions, so they can watch it change.
 - Draw the student's own example, the state they just described, the hint you just gave, or
