@@ -35,6 +35,8 @@ def select_agent(session: Session) -> Decision:
 
 def next_hint_level(session: Session, category: str) -> Decision:
     """The hint ladder: one step up per request for help, never past the top."""
+    if category == "confused":
+        return Decision(str(session.hint_level), "hint.reexplain", "student did not understand: same level, explained another way")
     if category not in policy.HINT_CATEGORIES:
         return Decision(str(session.hint_level), "hint.hold", f"message is '{category}', not a request for help")
     if session.hint_level >= policy.MAX_HINT_LEVEL:

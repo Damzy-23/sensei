@@ -3,6 +3,7 @@ message into exactly one category:
 
 - `ok`: a question, an idea, a description of their approach, or small talk about the problem.
 - `stuck`: they say they are stuck, lost, or ask for a hint or the next step.
+- `confused`: they did not understand the last reply, or ask for it to be explained again or differently.
 - `solution_request`: they ask for the full answer or the code.
 - `frustrated`: they are upset, discouraged or about to give up.
 - `off_topic`: unrelated to programming, interviews or this problem.

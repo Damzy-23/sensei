@@ -178,5 +178,41 @@
         "description": "One or two sentences on what to practise."
       }
     }
+  },
+  "play_explainer": {
+    "description": "Play a short animated explainer (about one minute) on the student's screen: a sequence of scenes, each with a drawing and a sentence that is read aloud. Use it to teach a general idea or to walk through an example step by step, especially when they say they do not understand. It narrates itself, so after calling it say only one short line and let it play.",
+    "parameters": {
+      "title": {
+        "type": "string",
+        "description": "What the explainer is about, in a few words."
+      },
+      "scenes": {
+        "type": "array",
+        "description": "Four to eight scenes, in order. Each scene shows one small step.",
+        "items": {
+          "type": "object",
+          "description": "One scene.",
+          "properties": {
+            "caption": {
+              "type": "string",
+              "description": "One or two plain sentences, read aloud. No code and no symbols."
+            },
+            "values": {
+              "type": "string",
+              "description": "The cells to draw, comma separated, for example 3,2,4. Empty string for a scene with words only."
+            },
+            "pointers": {
+              "type": "string",
+              "description": "Pointer labels by cell index, for example 0:left,2:right. Empty string for none."
+            }
+          },
+          "required": [
+            "caption",
+            "values",
+            "pointers"
+          ]
+        }
+      }
+    }
   }
 }

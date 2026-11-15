@@ -16,10 +16,10 @@ type NewItem = WithoutId<Item>;
 
 const MAX_ITEMS = 4;
 const MAX_CELLS = 16;
-const LOOKS_LIKE_CODE = /```|^\s*(def |for .+ in .+:|while .+:|return\b|import )/m;
+export const LOOKS_LIKE_CODE = /```|^\s*(def |for .+ in .+:|while .+:|return\b|import )/m;
 
 /** "0:left,4:right" -> {0: [left], 4: [right]}. Entries that do not parse are dropped. */
-function parsePointers(text: string, length: number): Map<number, string[]> {
+export function parsePointers(text: string, length: number): Map<number, string[]> {
   const out = new Map<number, string[]>();
   for (const part of text.split(",")) {
     const [index, label] = part.split(":").map((s) => s.trim());

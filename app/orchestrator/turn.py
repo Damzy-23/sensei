@@ -113,7 +113,7 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
                     problem_title=problem.title, pattern=problem.pattern, difficulty=problem.difficulty,
                     statement=catalog.statement(problem.id), student_message=body.text, student_code=body.code,
                     history=history, hint_level=session.hint_level, failed_runs=session.failed_runs,
-                    countdown_seconds=countdown(session),
+                    countdown_seconds=countdown(session), reexplain=verdict.category == "confused",
                 )
                 if agent.value in PANEL_AGENTS:
                     # The lead answers while the observer takes notes: side by side, so the panel adds no wait.

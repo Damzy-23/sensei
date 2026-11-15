@@ -1,5 +1,6 @@
 import { useApp, type PageId } from "./app-context";
 import { AgentActivity } from "./agent/AgentActivity";
+import { Explainer } from "./agent/Explainer";
 import { Glass } from "./agent/Glass";
 import { VoiceAgent } from "./agent/VoiceAgent";
 import { useAuth } from "./auth";
@@ -82,6 +83,7 @@ export function App() {
       {page === "logs" && <Logs />}
       <Glass />
       <AgentActivity />
+      <Explainer />
     </div>
   );
 }

@@ -38,6 +38,7 @@ export interface ToolSignatures {
   glass_steps: [{ title: string; steps: string[] }, { drawn: number }];
   glass_note: [{ text: string }, { drawn: number }];
   glass_clear: [Record<string, never>, Record<string, never>];
+  play_explainer: [{ title: string; scenes: { caption: string; values: string; pointers: string }[] }, { playing: true; scenes: number; seconds: number }];
   propose_calendar_event: [{ title: string; start: string; minutes: number; details: string }, { offered: true; start: string; end: string }];
 }
 export type ToolName = keyof ToolSignatures;
