@@ -77,6 +77,7 @@ never call each other.
 | **Model gateway** | The single path to a model: model choice, base vs tuned hint model, pricing | `app/llm/gateway.py` | Built |
 | **Evaluation** | Tuned vs base hint model: pairwise win rate, leak rate as a hard fail | `app/eval/` | Stubbed; results endpoint built |
 | **HTTP layer** | Routes only, no business rules | `app/api/`, `app/main.py` | Built |
+| **Access** | Who may read which session: a visitor the sessions their browser started, a mentor all of them. See "Who can see what" in [API.md](API.md) | `app/api/auth.py` | Built; on when `SENSEI_SCOPE_DATA=1` |
 | **Content** | The problem catalogue: data, not agent logic | `data/tracks/`, `app/catalog.py`, `app/stubs.py` | Blind 75 and NeetCode 150 listed (title, difficulty, pattern). Two problems have full statements and tests |
 
 ## Layering rules

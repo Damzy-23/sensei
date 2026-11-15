@@ -96,7 +96,10 @@ Not built yet: phone calls (needs a phone number on the voice provider); the pla
 the tuned-versus-base hint model evaluation (`/eval/results` returns placeholder data);
 generated video files (explainers are animations drawn in the page); and full statements and
 tests for the rest of the track problems. The API does not require sign-in: guests are
-allowed, so the mentor queue and the activity log are open to anyone with the address.
+allowed. With `SENSEI_SCOPE_DATA=1` a visitor sees only the sessions their own browser
+started and the team's mentors see every session; without it, the mentor queue and the
+activity log are open to anyone with the address. See "Who can see what" in
+[docs/API.md](docs/API.md).
 
 ## Live demo
 
