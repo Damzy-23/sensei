@@ -1,6 +1,8 @@
-"""Phase 1 stub data. Lets the frontend build against the real contract before the
-orchestrator exists. Shapes match app/models.py exactly. Contains no reference
-solutions and no hidden tests.
+"""Stub data for endpoints that later phases replace. Shapes match app/models.py.
+
+Contains no reference solutions and no hidden tests. `run_stub_turn` writes a real
+trace through the tracing API, so trace endpoints and the inspector work end to end.
+It is removed in Phase 5, when the orchestrator produces real turns.
 """
 
 from __future__ import annotations
@@ -21,13 +23,9 @@ from app.models import (
     SessionState,
     Ticket,
     TicketDetail,
-    TraceEvent,
-    TraceNode,
-    TraceTree,
     VisibleTest,
 )
-
-STUB_TRACE_ID = "trc_stub_0001"
+from app.tracing.context import span, turn
 
 
 def now_iso() -> str:
@@ -97,7 +95,33 @@ def session_exists(session_id: str) -> bool:
     return session_id in _SESSIONS
 
 
-def stub_final(session_id: str) -> FinalEvent:
+def run_stub_turn(session_id: str, text: str) -> str:
+    """Write one realistic turn through the tracing API and return its trace_id."""
+    with turn(session_id, name="message") as tctx:
+        with span("guard", "guard.input", "classify_input", input_text=text) as g:
+            g.decision = "ok"
+            g.reason = "fast model: ok (0.94)"
+            g.model = "claude-haiku-5-5"
+            g.tokens_in = 180
+            g.tokens_out = 12
+            g.output = '{"category":"ok"}'
+        with span("orchestrator", "mode.decision", "select_mode", input_text="failed_runs=2 hint_level=1") as m:
+            m.decision = "learn"
+            m.reason = "rule learn.default: no solved runs yet"
+        with span("hint_coach", "agent.start", "hint_coach") as agent:
+            agent.output = "routed to hint_coach"
+            with span("hint_coach", "llm.call", "llm_hint", input_text="level=1 problem=two-sum") as llm:
+                llm.model = "claude-sonnet-5-5"
+                llm.tokens_in = 640
+                llm.tokens_out = 70
+                llm.output = "(stub hint)"
+        with span("guard", "guard.output", "leak_check", input_text="level=1") as o:
+            o.decision = "pass"
+            o.reason = "no code before L5; similarity 0.12 < 0.80"
+    return tctx.trace_id
+
+
+def stub_final(trace_id: str, session_id: str) -> FinalEvent:
     return FinalEvent(
         reply=(
             "Good start. Try writing down what you need to know about each number as you "
@@ -106,40 +130,8 @@ def stub_final(session_id: str) -> FinalEvent:
         mode="learn",
         hint_level=1,
         escalated=False,
-        trace_id=STUB_TRACE_ID,
+        trace_id=trace_id,
     )
-
-
-def stub_trace_events(session_id: str) -> list[TraceEvent]:
-    """A short realistic turn: guard -> mode -> hint coach -> output guard."""
-    t = now_iso()
-    base = dict(trace_id=STUB_TRACE_ID, session_id=session_id, ts=t)
-    return [
-        TraceEvent(event_id="evt_0001", span_id="spn_root", parent_span_id=None, seq=1,
-                   actor="orchestrator", type="turn.start", name="turn", status="ok",
-                   latency_ms=1310.0, **base),
-        TraceEvent(event_id="evt_0002", span_id="spn_guard", parent_span_id="spn_root", seq=2,
-                   actor="guard", type="guard.input", name="classify_input", status="ok",
-                   decision="ok", reason="fast model: ok (0.94)", latency_ms=212.0,
-                   model="claude-haiku-5-5", tokens_in=180, tokens_out=12, cost_usd=0.00004,
-                   input="I'm stuck on how to find the pair", output='{"category":"ok"}', **base),
-        TraceEvent(event_id="evt_0003", span_id="spn_mode", parent_span_id="spn_root", seq=3,
-                   actor="orchestrator", type="mode.decision", name="select_mode", status="ok",
-                   decision="learn", reason="rule learn.default: no solved runs yet",
-                   latency_ms=1.2, **base),
-        TraceEvent(event_id="evt_0004", span_id="spn_coach", parent_span_id="spn_root", seq=4,
-                   actor="hint_coach", type="agent.start", name="hint_coach", status="ok", **base),
-        TraceEvent(event_id="evt_0005", span_id="spn_llm", parent_span_id="spn_coach", seq=5,
-                   actor="hint_coach", type="llm.call", name="llm_hint", status="ok",
-                   model="claude-sonnet-5-5", latency_ms=980.0, tokens_in=640, tokens_out=70,
-                   cost_usd=0.0029, input="level=1 problem=two-sum", output="(hint text)", **base),
-        TraceEvent(event_id="evt_0006", span_id="spn_out", parent_span_id="spn_root", seq=6,
-                   actor="guard", type="guard.output", name="leak_check", status="ok",
-                   decision="pass", reason="no code before L5; similarity 0.12 < 0.80",
-                   latency_ms=15.0, **base),
-        TraceEvent(event_id="evt_0007", span_id="spn_root", parent_span_id=None, seq=7,
-                   actor="orchestrator", type="turn.end", name="turn", status="ok", **base),
-    ]
 
 
 def stub_run_out(run: RunIn) -> RunOut:
@@ -161,25 +153,6 @@ def stub_state(session_id: str) -> SessionState:
         escalated=False,
         countdown_seconds=None,
     )
-
-
-def stub_trace_tree(trace_id: str, session_id: str) -> TraceTree:
-    events = stub_trace_events(session_id)
-    by_span: dict[str, TraceNode] = {}
-    roots: list[TraceNode] = []
-    # A span emits a start and an end event; the tree shows the first (start) one.
-    for ev in events:
-        if ev.span_id not in by_span:
-            by_span[ev.span_id] = TraceNode(event=ev)
-    for ev in events:
-        node = by_span[ev.span_id]
-        if node.event is not ev:
-            continue
-        if ev.parent_span_id and ev.parent_span_id in by_span:
-            by_span[ev.parent_span_id].children.append(node)
-        else:
-            roots.append(node)
-    return TraceTree(trace_id=trace_id, session_id=session_id, roots=roots)
 
 
 _TICKETS: dict[str, TicketDetail] = {

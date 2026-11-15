@@ -118,20 +118,29 @@ def test_state_shape(client: TestClient, session_id: str) -> None:
 
 
 def test_session_events_stream(client: TestClient, session_id: str) -> None:
-    with client.stream("GET", f"/sessions/{session_id}/events") as r:
+    body = {"text": "I'm stuck", "problem_id": "two-sum", "code": ""}
+    client.post(f"/sessions/{session_id}/message", json=body)
+    # follow=false replays stored events and ends; the default live mode would stay open.
+    with client.stream("GET", f"/sessions/{session_id}/events?follow=false") as r:
         assert r.status_code == 200
         events = _parse_sse("".join(r.iter_text()))
     assert events[0][0] == "trace"
     assert events[-1][0] == "end"
 
 
-def test_trace_tree(client: TestClient) -> None:
-    r = client.get("/traces/trc_stub_0001")
+def test_trace_tree_from_message(client: TestClient, session_id: str) -> None:
+    body = {"text": "I'm stuck", "problem_id": "two-sum", "code": ""}
+    events = _parse_sse(client.post(f"/sessions/{session_id}/message", json=body).text)
+    trace_id = events[-1][1]["trace_id"]
+
+    r = client.get(f"/traces/{trace_id}")
     assert r.status_code == 200
     tree = r.json()
     assert tree["roots"], "expected at least one root span"
-    assert tree["roots"][0]["event"]["type"] == "turn.start"
-    assert client.get("/traces/unknown").status_code == 404
+    root = tree["roots"][0]["event"]
+    assert root["type"] == "turn.end"
+    assert tree["roots"][0]["children"], "root span should have child spans"
+    assert client.get("/traces/trc_missing").status_code == 404
 
 
 def test_mentor_ticket_flow(client: TestClient) -> None:

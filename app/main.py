@@ -1,7 +1,7 @@
-"""Sensei FastAPI app. Phase 1: every endpoint from docs/API.md, served from stubs.
+"""Sensei FastAPI app.
 
 SSE framing: each message is `event: <name>` + `data: <json>` + blank line.
-Event names: `trace` (one per TraceEvent), `final` (FinalEvent), `error`, `end`.
+Event names: `trace` (one per TraceEvent), `final` (FinalEvent), `end`, and `:` keepalive comments.
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ import asyncio
 import json
 from collections.abc import AsyncIterator
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -19,7 +19,6 @@ from app import stubs
 from app.models import (
     ChatMessage,
     EvalResults,
-    FinalEvent,
     MentorReplyIn,
     MessageIn,
     Problem,
@@ -32,8 +31,11 @@ from app.models import (
     TicketDetail,
     TraceTree,
 )
+from app.tools.client import run_tests
+from app.tracing import store
+from app.tracing.context import turn
 
-app = FastAPI(title="Sensei API", version="0.1.0")
+app = FastAPI(title="Sensei API", version="0.2.0")
 
 # Open CORS for development (hackathon scope).
 app.add_middleware(
@@ -68,12 +70,14 @@ async def post_message(session_id: str, body: MessageIn) -> StreamingResponse:
     if stubs.get_problem(body.problem_id) is None:
         raise HTTPException(status_code=404, detail="problem not found")
 
+    trace_id = stubs.run_stub_turn(session_id, body.text)
+    events = store.load_trace(trace_id)
+
     async def stream() -> AsyncIterator[str]:
-        for ev in stubs.stub_trace_events(session_id):
+        for ev in events:
             yield sse("trace", ev)
             await asyncio.sleep(0.05)  # simulate streaming latency
-        final: FinalEvent = stubs.stub_final(session_id)
-        yield sse("final", final)
+        yield sse("final", stubs.stub_final(trace_id, session_id))
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -83,7 +87,9 @@ async def post_run(session_id: str, body: RunIn) -> RunOut:
     _require_session(session_id)
     if stubs.get_problem(body.problem_id) is None:
         raise HTTPException(status_code=404, detail="problem not found")
-    return stubs.stub_run_out(body)
+    with turn(session_id, name="runs"):
+        await run_tests(session_id, body)
+        return stubs.stub_run_out(body)
 
 
 @app.get("/sessions/{session_id}/state", response_model=SessionState)
@@ -93,15 +99,36 @@ async def get_state(session_id: str) -> SessionState:
 
 
 @app.get("/sessions/{session_id}/events")
-async def session_events(session_id: str) -> StreamingResponse:
-    """Live trace stream for the agent inspector. Phase 1 stub: replays one turn then ends."""
+async def session_events(session_id: str, request: Request, follow: bool = True) -> StreamingResponse:
+    """Agent inspector feed. Replays stored events, then (if follow=true) streams live ones.
+
+    follow=false replays and ends with `event: end`. Tests and the simulator use it.
+    """
     _require_session(session_id)
 
     async def stream() -> AsyncIterator[str]:
-        for ev in stubs.stub_trace_events(session_id):
-            yield sse("trace", ev)
-            await asyncio.sleep(0.02)
-        yield sse("end", {"reason": "stub replay complete"})
+        queue = store.subscribe(session_id) if follow else None
+        seen: set[str] = set()
+        try:
+            for ev in store.load_session_events(session_id):
+                seen.add(ev.event_id)
+                yield sse("trace", ev)
+            if queue is None:
+                yield sse("end", {"reason": "replay complete"})
+                return
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    ev = await asyncio.wait_for(queue.get(), timeout=15)
+                except asyncio.TimeoutError:
+                    yield ": keepalive\n\n"
+                    continue
+                if ev.event_id not in seen:
+                    yield sse("trace", ev)
+        finally:
+            if queue is not None:
+                store.unsubscribe(session_id, queue)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -127,9 +154,10 @@ async def get_problem(problem_id: str) -> ProblemDetail:
 
 @app.get("/traces/{trace_id}", response_model=TraceTree)
 async def get_trace(trace_id: str) -> TraceTree:
-    if trace_id != stubs.STUB_TRACE_ID:
+    events = store.load_trace(trace_id)
+    if not events:
         raise HTTPException(status_code=404, detail="trace not found")
-    return stubs.stub_trace_tree(trace_id, session_id="ses_demo_0001")
+    return TraceTree(trace_id=trace_id, session_id=events[0].session_id, roots=store.build_tree(events))
 
 
 # ---------- mentor ----------
