@@ -122,7 +122,7 @@ def test_missing_key_is_reported_without_calling_provider(monkeypatch: pytest.Mo
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     calls, provider = _fake([ProviderReply("unused", 1, 1)])
     monkeypatch.setitem(client.PROVIDERS, "anthropic", provider)
-    with pytest.raises(ModelNotConfigured):
+    with pytest.raises(LLMError, match="not configured"):
         _run()
     assert calls == []
 

@@ -50,10 +50,14 @@ async def classify_input(session_id: str, text: str, regex_category: str | None)
     model_category = None
     model_conf = 0.0
     if regex_category != "injection":
-        reply = await call("fast", "You classify coaching messages. Reply with JSON only.",
-                           classify_messages(text), actor="guard", name="llm_classify",
-                           json_schema=CLASSIFY_SCHEMA, max_tokens=60)
-        model_category, model_conf = parse_classification(reply.data)
+        try:
+            reply = await call("fast", "You classify coaching messages. Reply with JSON only.",
+                               classify_messages(text), actor="guard", name="llm_classify",
+                               json_schema=CLASSIFY_SCHEMA, max_tokens=60)
+            model_category, model_conf = parse_classification(reply.data)
+        except LLMError:
+            # Classifier unavailable: rely on the regex rules alone, and say so in the trace.
+            model_category, model_conf = None, 0.0
 
     # An injection found by regex_precheck is trusted without a second check.
     regex_hit = RegexHit("injection", "regex_precheck", text[:40]) if regex_category == "injection" else regex_rules(text)

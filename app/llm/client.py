@@ -20,7 +20,7 @@ from typing import Any
 
 import httpx
 
-from app.llm.models import ModelTarget, resolve
+from app.llm.models import ModelNotConfigured, ModelTarget, resolve
 from app.models import Actor
 from app.tracing.context import span
 
@@ -137,7 +137,11 @@ async def call(
     max_tokens: int = 800,
 ) -> LLMResult:
     """One traced model call. Raises LLMError (or LLMJSONError) when it cannot recover."""
-    target = resolve(model_key)  # ModelNotConfigured if keys are missing: no span needed
+    try:
+        target = resolve(model_key)
+    except ModelNotConfigured as exc:
+        # Missing key or endpoint: callers handle LLMError, so the turn degrades instead of crashing.
+        raise LLMError(f"{model_key} not configured: {exc}") from exc
     provider = PROVIDERS[target.provider]
     input_text = json.dumps(messages, ensure_ascii=False)
 

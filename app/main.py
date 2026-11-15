@@ -1,7 +1,8 @@
 """Sensei FastAPI app.
 
 SSE framing: each message is `event: <name>` + `data: <json>` + blank line.
-Event names: `trace` (one per TraceEvent), `final` (FinalEvent), `end`, and `:` keepalive comments.
+Event names: `trace` (one per TraceEvent, live), `final` (FinalEvent), `error`, `end`,
+and `:` keepalive comments.
 """
 
 from __future__ import annotations
@@ -19,6 +20,7 @@ from app import bank, state, stubs
 from app.models import (
     ChatMessage,
     EvalResults,
+    FinalEvent,
     MentorReplyIn,
     MessageIn,
     Problem,
@@ -31,11 +33,11 @@ from app.models import (
     TicketDetail,
     TraceTree,
 )
-from app.tools.client import run_tests
+from app.orchestrator.pipeline import handle_message, handle_run
+from app.tools import escalation as escalation_tools
 from app.tracing import store
-from app.tracing.context import turn
 
-app = FastAPI(title="Sensei API", version="0.2.0")
+app = FastAPI(title="Sensei API", version="0.3.0")
 
 # Open CORS for development (hackathon scope).
 app.add_middleware(
@@ -56,6 +58,17 @@ def _require_session(session_id: str) -> None:
         raise HTTPException(status_code=404, detail="session not found")
 
 
+def _ticket_view(row: dict) -> Ticket:
+    return Ticket(
+        id=row["id"],
+        session_id=row["session_id"],
+        problem_id=row["problem_id"],
+        status=row["status"],
+        stuck_reason=row["stuck_reason"],
+        created_at=row["created_at"],
+    )
+
+
 # ---------- sessions ----------
 
 
@@ -66,22 +79,34 @@ async def create_session() -> SessionCreated:
 
 @app.post("/sessions/{session_id}/message")
 async def post_message(session_id: str, body: MessageIn) -> StreamingResponse:
+    """Run one turn and stream its trace events live, then the final reply."""
     _require_session(session_id)
     if bank.get_public(body.problem_id) is None:
         raise HTTPException(status_code=404, detail="problem not found")
 
-    trace_id = stubs.run_stub_turn(session_id, body.text)
-    events = store.load_trace(trace_id)
-    final = stubs.stub_final(trace_id, session_id)
-    state.update_session(session_id, problem_id=body.problem_id)
-    state.add_message(session_id, "student", body.text, trace_id=trace_id)
-    state.add_message(session_id, "coach", final.reply, trace_id=trace_id)
+    queue = store.subscribe(session_id)
+    task = asyncio.create_task(handle_message(session_id, body.text, body.problem_id, body.code))
 
     async def stream() -> AsyncIterator[str]:
-        for ev in events:
-            yield sse("trace", ev)
-            await asyncio.sleep(0.05)  # simulate streaming latency
-        yield sse("final", final)
+        try:
+            while not task.done() or not queue.empty():
+                try:
+                    ev = await asyncio.wait_for(queue.get(), timeout=0.2)
+                except asyncio.TimeoutError:
+                    continue
+                yield sse("trace", ev)
+            result = await task
+            yield sse("final", FinalEvent(
+                reply=result.reply,
+                mode=result.mode,  # type: ignore[arg-type]
+                hint_level=result.hint_level,
+                escalated=result.escalated,
+                trace_id=result.trace_id,
+            ))
+        except Exception as exc:  # noqa: BLE001 - surfaced to the client, not swallowed
+            yield sse("error", {"message": f"{type(exc).__name__}: {exc}"})
+        finally:
+            store.unsubscribe(session_id, queue)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -91,9 +116,7 @@ async def post_run(session_id: str, body: RunIn) -> RunOut:
     _require_session(session_id)
     if bank.get_public(body.problem_id) is None:
         raise HTTPException(status_code=404, detail="problem not found")
-    with turn(session_id, name="runs"):
-        await run_tests(session_id, body)
-        return stubs.stub_run_out(body)
+    return RunOut(**await handle_run(session_id, body))
 
 
 @app.get("/sessions/{session_id}/state", response_model=SessionState)
@@ -171,31 +194,36 @@ async def get_trace(trace_id: str) -> TraceTree:
 
 @app.get("/mentor/tickets", response_model=list[Ticket])
 async def list_tickets() -> list[Ticket]:
-    return stubs.list_tickets()
+    return [_ticket_view(row) for row in state.list_ticket_rows()]
 
 
 @app.get("/mentor/tickets/{ticket_id}", response_model=TicketDetail)
 async def get_ticket(ticket_id: str) -> TicketDetail:
-    ticket = stubs.get_ticket(ticket_id)
-    if ticket is None:
+    row = state.get_ticket_row(ticket_id)
+    if row is None:
         raise HTTPException(status_code=404, detail="ticket not found")
-    return ticket
+    return TicketDetail(
+        **_ticket_view(row).model_dump(),
+        transcript=state.list_messages(row["session_id"]),
+        latest_code=row["latest_code"],
+        suggested_intervention=row["suggested_intervention"],
+    )
 
 
 @app.post("/mentor/tickets/{ticket_id}/reply", response_model=ChatMessage)
 async def reply_ticket(ticket_id: str, body: MentorReplyIn) -> ChatMessage:
-    msg = stubs.add_mentor_reply(ticket_id, body.text)
-    if msg is None:
+    if state.get_ticket_row(ticket_id) is None:
         raise HTTPException(status_code=404, detail="ticket not found")
-    return msg
+    message_id = escalation_tools.relay_mentor_message(ticket_id, body.text)
+    return next(m for m in state.list_messages(state.get_ticket_row(ticket_id)["session_id"]) if m.id == message_id)  # type: ignore[index]
 
 
 @app.post("/mentor/tickets/{ticket_id}/resolve", response_model=Ticket)
 async def resolve_ticket(ticket_id: str) -> Ticket:
-    ticket = stubs.resolve_ticket(ticket_id)
-    if ticket is None:
+    row = state.resolve_ticket_row(ticket_id)
+    if row is None:
         raise HTTPException(status_code=404, detail="ticket not found")
-    return ticket
+    return _ticket_view(row)
 
 
 # ---------- eval ----------

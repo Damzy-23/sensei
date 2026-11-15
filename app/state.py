@@ -15,6 +15,7 @@ from pydantic import BaseModel
 
 from app.db import get_conn, write_lock
 from app.models import ChatActor, ChatMessage, Mode, RunIn, SessionState
+from app.policy import load_policy
 
 
 def _now() -> str:
@@ -105,6 +106,9 @@ def state_view(session_id: str) -> SessionState | None:
     if record.problem_started_at:
         started = datetime.fromisoformat(record.problem_started_at)
         elapsed = max(0, int((datetime.now(timezone.utc) - started).total_seconds()))
+    countdown = None
+    if record.mode == "blitz":
+        countdown = max(0, load_policy().modes.blitz_countdown_seconds - elapsed)
     return SessionState(
         session_id=session_id,
         problem_id=record.problem_id,
@@ -115,7 +119,7 @@ def state_view(session_id: str) -> SessionState | None:
         time_on_problem=elapsed,
         mastery=get_mastery(session_id),
         escalated=record.escalated,
-        countdown_seconds=None,
+        countdown_seconds=countdown,
     )
 
 

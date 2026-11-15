@@ -8,6 +8,7 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
+from app import state
 from app.main import app
 
 FORBIDDEN_KEYS = {"reference_solution", "hidden_tests"}
@@ -143,10 +144,10 @@ def test_trace_tree_from_message(client: TestClient, session_id: str) -> None:
     assert client.get("/traces/trc_missing").status_code == 404
 
 
-def test_mentor_ticket_flow(client: TestClient) -> None:
+def test_mentor_ticket_flow(client: TestClient, session_id: str) -> None:
+    tid = state.create_ticket(session_id, "two-sum", "stuck for a while", "def f(): pass", "ask about the loop")
     tickets = client.get("/mentor/tickets").json()
-    assert tickets
-    tid = tickets[0]["id"]
+    assert any(t["id"] == tid for t in tickets)
 
     detail = client.get(f"/mentor/tickets/{tid}").json()
     assert {"transcript", "latest_code", "suggested_intervention", "stuck_reason"} <= set(detail)
