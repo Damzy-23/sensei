@@ -37,6 +37,7 @@ export interface ToolSignatures {
   glass_array: [{ values: string[]; pointers: string; caption: string }, { drawn: number }];
   glass_steps: [{ title: string; steps: string[] }, { drawn: number }];
   glass_note: [{ text: string }, { drawn: number }];
+  glass_3d: [{ scene: "bars" | "grid" | "tree" | "graph"; values: string[]; pointers?: string; water?: string; highlight?: string; edges?: string; caption?: string }, { drawn: number }];
   glass_clear: [Record<string, never>, Record<string, never>];
   propose_calendar_event: [{ title: string; start: string; minutes: number; details: string }, { offered: true; start: string; end: string }];
 }
@@ -91,3 +92,9 @@ async function run<N extends ToolName>(name: N, args: ToolSignatures[N][0]): Pro
 }
 
 export const availableTools = (): ToolName[] => [...handlers.keys()];
+
+// Rehearsal and testing: with ?tools in the URL, page tools can be called from the browser
+// console (window.seniorTools.invoke("glass_3d", {...})) without a voice call.
+if (typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tools")) {
+  (window as unknown as { seniorTools: unknown }).seniorTools = { invoke };
+}

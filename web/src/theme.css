@@ -309,3 +309,8 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
   .nav-group + .nav-group { padding-left: 16px; }
 }
 .gis-slot { min-height: 44px; display: flex; justify-content: center; color-scheme: light; }
+
+/* 3D drawings on the glass */
+.glass-3d { width: 100%; height: 260px; border-radius: 12px; overflow: hidden; background: radial-gradient(ellipse at 50% 20%, rgba(134, 187, 216, 0.12), transparent 70%), #0a1319; }
+.glass-3d-loading { display: grid; place-items: center; color: var(--text-3); font-size: 12px; }
+@media (max-width: 640px) { .glass-3d { height: 220px; } }

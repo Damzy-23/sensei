@@ -2,13 +2,20 @@
 // tools (glass_array, glass_steps, glass_note, glass_clear), so the agent's drawings go
 // through the same registry, and the same limits, as every other action it takes.
 
-import { useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useState } from "react";
+import type { SceneKind, SceneSpec } from "./Scene3D";
 import { registerTool } from "./tools";
+
+// three.js only downloads the first time the agent draws in 3D.
+const Scene3D = lazy(() => import("./Scene3D"));
+const SCENES: SceneKind[] = ["bars", "grid", "tree", "graph"];
+const MAX_NODES = 31;
 
 type Item =
   | { id: number; kind: "array"; values: string[]; pointers: Map<number, string[]>; caption: string }
   | { id: number; kind: "steps"; title: string; steps: string[] }
   | { id: number; kind: "note"; text: string }
+  | { id: number; kind: "scene"; spec: SceneSpec; caption: string }
   | { id: number; kind: "event"; title: string; when: string; url: string };
 
 type WithoutId<T> = T extends unknown ? Omit<T, "id"> : never;
@@ -70,6 +77,23 @@ export function Glass() {
         refuseCode(text);
         return add({ kind: "note", text });
       }),
+      registerTool("glass_3d", ({ scene, values, pointers, water, highlight, edges, caption }) => {
+        if (!SCENES.includes(scene)) throw new Error(`scene must be one of ${SCENES.join(", ")}.`);
+        if (!Array.isArray(values) || values.length === 0) throw new Error("values must be a non-empty list.");
+        if (values.length > MAX_NODES) throw new Error(`Draw at most ${MAX_NODES} values.`);
+        refuseCode(caption ?? "");
+        const cells = values.map(String);
+        const span = /^\s*(\d+)\s*-\s*(\d+)\s*$/.exec(water ?? "");
+        const pairs = (edges ?? "").split(",").map((e) => e.split("-").map((n) => Number(n.trim())))
+          .filter((p): p is [number, number] => p.length === 2 && p.every((n) => Number.isInteger(n) && n >= 0 && n < cells.length));
+        const spec: SceneSpec = {
+          scene, values: cells, pointers: parsePointers(pointers ?? "", cells.length),
+          water: span ? [Number(span[1]), Number(span[2])] : null,
+          highlight: new Set((highlight ?? "").split(",").map((h) => h.trim()).filter(Boolean)),
+          edges: pairs,
+        };
+        return add({ kind: "scene", spec, caption: caption ?? "" });
+      }),
       registerTool("glass_clear", () => { setItems([]); return {}; }),
       registerTool("propose_calendar_event", ({ title, start, minutes, details }) => {
         const begins = new Date(start);
@@ -115,6 +139,11 @@ export function Glass() {
                 {item.steps.map((step, i) => <li key={i}>{step}</li>)}
               </ol>
             </>
+          )}
+          {item.kind === "scene" && (
+            <Suspense fallback={<div className="glass-3d glass-3d-loading">Drawing in 3D…</div>}>
+              <Scene3D spec={item.spec} caption={item.caption} />
+            </Suspense>
           )}
           {item.kind === "note" && <div style={{ fontSize: 13, lineHeight: "20px" }}>{item.text}</div>}
           {item.kind === "event" && (

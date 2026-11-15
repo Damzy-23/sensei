@@ -125,6 +125,49 @@
       }
     }
   },
+  "glass_3d": {
+    "description": "Draw a 3D picture on the glass that the student can turn with their finger or mouse. Use it to make an idea visible: an array as bars (with two pointers, and water between them for container problems), a grid of land and water, a binary tree, or a graph. Draw the student's own example or the state they describe. Never use it to reveal the answer.",
+    "parameters": {
+      "scene": {
+        "type": "string",
+        "enum": [
+          "bars",
+          "grid",
+          "tree",
+          "graph"
+        ],
+        "description": "bars: an array. grid: rows of 0 and 1. tree: a binary tree in level order. graph: nodes and edges."
+      },
+      "values": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "description": "One value."
+        },
+        "description": "bars: the numbers, left to right. grid: one string per row, like 1,1,0. tree: values in level order, null for a gap. graph: one label per node."
+      },
+      "pointers": {
+        "type": "string",
+        "description": "bars only: pointer labels by index, like 0:left,8:right. Empty string for none."
+      },
+      "water": {
+        "type": "string",
+        "description": "bars only: fill water between two indices, like 1-8. Empty string for none."
+      },
+      "highlight": {
+        "type": "string",
+        "description": "Indices to light up, like 2,3. For grid, row:column pairs like 0:1,1:1. Empty string for none."
+      },
+      "edges": {
+        "type": "string",
+        "description": "graph only: edges by node index, like 0-1,1-2,2-0. Empty string for none."
+      },
+      "caption": {
+        "type": "string",
+        "description": "One short sentence shown under the drawing. No code."
+      }
+    }
+  },
   "glass_clear": {
     "description": "Wipe the glass clean.",
     "parameters": {}
