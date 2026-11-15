@@ -37,6 +37,74 @@ CREATE TABLE IF NOT EXISTS events (
 );
 CREATE INDEX IF NOT EXISTS idx_events_trace ON events (trace_id, seq);
 CREATE INDEX IF NOT EXISTS idx_events_session ON events (session_id, ts);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id        TEXT PRIMARY KEY,
+    created_at        TEXT NOT NULL,
+    updated_at        TEXT NOT NULL,
+    problem_id        TEXT,
+    mode              TEXT NOT NULL DEFAULT 'learn',
+    hint_level        INTEGER NOT NULL DEFAULT 0,
+    failed_runs       INTEGER NOT NULL DEFAULT 0,
+    hints_used        INTEGER NOT NULL DEFAULT 0,
+    guard_violations  INTEGER NOT NULL DEFAULT 0,
+    frustration_flags INTEGER NOT NULL DEFAULT 0,
+    solved_streak     INTEGER NOT NULL DEFAULT 0,
+    problem_started_at TEXT,
+    escalated         INTEGER NOT NULL DEFAULT 0
+);
+CREATE TABLE IF NOT EXISTS messages (
+    id         TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions (session_id),
+    actor      TEXT NOT NULL,
+    text       TEXT NOT NULL,
+    ts         TEXT NOT NULL,
+    trace_id   TEXT
+);
+CREATE INDEX IF NOT EXISTS idx_messages_session ON messages (session_id, ts);
+CREATE TABLE IF NOT EXISTS runs (
+    id            TEXT PRIMARY KEY,
+    session_id    TEXT NOT NULL REFERENCES sessions (session_id),
+    problem_id    TEXT NOT NULL,
+    code          TEXT NOT NULL,
+    passed        INTEGER NOT NULL,
+    failed        INTEGER NOT NULL,
+    total         INTEGER NOT NULL,
+    failures_json TEXT NOT NULL,
+    runtime_ms    INTEGER NOT NULL,
+    created_at    TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_runs_session ON runs (session_id, created_at);
+CREATE TABLE IF NOT EXISTS hints (
+    id         TEXT PRIMARY KEY,
+    session_id TEXT NOT NULL REFERENCES sessions (session_id),
+    problem_id TEXT NOT NULL,
+    level      INTEGER NOT NULL,
+    created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS mastery (
+    session_id TEXT NOT NULL REFERENCES sessions (session_id),
+    pattern    TEXT NOT NULL,
+    score      REAL NOT NULL,
+    PRIMARY KEY (session_id, pattern)
+);
+CREATE TABLE IF NOT EXISTS tickets (
+    id                    TEXT PRIMARY KEY,
+    session_id            TEXT NOT NULL REFERENCES sessions (session_id),
+    problem_id            TEXT NOT NULL,
+    status                TEXT NOT NULL,
+    stuck_reason          TEXT NOT NULL,
+    latest_code           TEXT NOT NULL,
+    suggested_intervention TEXT NOT NULL,
+    created_at            TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS eval_runs (
+    id           TEXT PRIMARY KEY,
+    started_at   TEXT NOT NULL,
+    finished_at  TEXT,
+    status       TEXT NOT NULL,
+    results_json TEXT
+);
 """
 
 write_lock = threading.RLock()

@@ -74,25 +74,12 @@ _PROBLEMS: dict[str, ProblemDetail] = {
     ),
 }
 
-_SESSIONS: dict[str, dict] = {}
-
-
 def list_problems() -> list[Problem]:
     return [Problem(**p.model_dump(exclude={"statement", "starter_code", "visible_tests"})) for p in _PROBLEMS.values()]
 
 
 def get_problem(problem_id: str) -> ProblemDetail | None:
     return _PROBLEMS.get(problem_id)
-
-
-def create_session() -> str:
-    session_id = new_id("ses")
-    _SESSIONS[session_id] = {"created": now_iso()}
-    return session_id
-
-
-def session_exists(session_id: str) -> bool:
-    return session_id in _SESSIONS
 
 
 def run_stub_turn(session_id: str, text: str) -> str:

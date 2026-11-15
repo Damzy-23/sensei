@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app import stubs
+from app import state, stubs
 from app.models import (
     ChatMessage,
     EvalResults,
@@ -52,7 +52,7 @@ def sse(event: str, data: BaseModel | dict) -> str:
 
 
 def _require_session(session_id: str) -> None:
-    if not stubs.session_exists(session_id):
+    if state.get_session(session_id) is None:
         raise HTTPException(status_code=404, detail="session not found")
 
 
@@ -61,7 +61,7 @@ def _require_session(session_id: str) -> None:
 
 @app.post("/sessions", status_code=201, response_model=SessionCreated)
 async def create_session() -> SessionCreated:
-    return SessionCreated(session_id=stubs.create_session())
+    return SessionCreated(session_id=state.create_session())
 
 
 @app.post("/sessions/{session_id}/message")
@@ -72,12 +72,16 @@ async def post_message(session_id: str, body: MessageIn) -> StreamingResponse:
 
     trace_id = stubs.run_stub_turn(session_id, body.text)
     events = store.load_trace(trace_id)
+    final = stubs.stub_final(trace_id, session_id)
+    state.update_session(session_id, problem_id=body.problem_id)
+    state.add_message(session_id, "student", body.text, trace_id=trace_id)
+    state.add_message(session_id, "coach", final.reply, trace_id=trace_id)
 
     async def stream() -> AsyncIterator[str]:
         for ev in events:
             yield sse("trace", ev)
             await asyncio.sleep(0.05)  # simulate streaming latency
-        yield sse("final", stubs.stub_final(trace_id, session_id))
+        yield sse("final", final)
 
     return StreamingResponse(stream(), media_type="text/event-stream")
 
@@ -94,8 +98,10 @@ async def post_run(session_id: str, body: RunIn) -> RunOut:
 
 @app.get("/sessions/{session_id}/state", response_model=SessionState)
 async def get_state(session_id: str) -> SessionState:
-    _require_session(session_id)
-    return stubs.stub_state(session_id)
+    view = state.state_view(session_id)
+    if view is None:
+        raise HTTPException(status_code=404, detail="session not found")
+    return view
 
 
 @app.get("/sessions/{session_id}/events")
