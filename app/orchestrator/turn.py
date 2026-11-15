@@ -85,6 +85,7 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
         try:
             session.start_problem(problem.id)
             session.latest_code = body.code
+            session.student_turns += 1
             memory.add_message(session_id, "student", body.text, trace.trace_id)
 
             verdict = await input_guard.classify(body.text)
@@ -104,7 +105,7 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
                         session.hints_used += 1
                     session.hint_level = int(level.value)
                 # A line of code is earned by trying; decided by rule, in learn mode only.
-                code = rules.code_help(session)
+                code = rules.code_help(session, verdict.category)
                 if agent.value == "hint_coach":
                     _record(code, "select_code_help")
                 code_lines = 1 if code.value == "one_line" else 0

@@ -66,6 +66,7 @@ class Session:
     latest_code: str = ""
     mastery: dict[str, float] = field(default_factory=dict)
     code_lines_given: int = 0  # lines of code the coach has given on the current problem
+    student_turns: int = 0  # messages the student has sent on the current problem
     panel_notes: list[dict] = field(default_factory=list)  # the observer's signals for the current problem
 
     def time_on_problem(self) -> int:
@@ -88,7 +89,7 @@ class Session:
         if self.problem_id == problem_id:
             return
         self.problem_id, self.problem_started_at = problem_id, now_iso()
-        self.hint_level = self.failed_runs = self.hints_used = self.code_lines_given = 0
+        self.hint_level = self.failed_runs = self.hints_used = self.code_lines_given = self.student_turns = 0
         self.panel_notes = []
 
 

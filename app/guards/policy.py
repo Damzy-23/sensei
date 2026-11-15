@@ -11,8 +11,8 @@ MAX_HINT_LEVEL = 5
 ESCALATE_AFTER_GUARD_VIOLATIONS = 3
 ESCALATE_AFTER_FRUSTRATION_FLAGS = 2
 MAX_LEAK_RETRIES = 1
-# Code help is earned, not refused outright: after this many tries on a problem (requests for
-# help plus failed test runs) the coach may give one line of code per turn.
+# A student who asks for a line of code gets one. Unasked, the coach offers one only after this
+# many tries on a problem (messages the student has sent plus failed test runs).
 CODE_HELP_AFTER_TRIES = 3
 # ... and at most this many lines on one problem, so the student still writes the solution.
 CODE_LINES_PER_PROBLEM = 3

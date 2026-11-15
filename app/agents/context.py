@@ -30,7 +30,7 @@ class AgentContext:
         parts.append(f"Student's current code:\n{self.student_code.strip() or '(nothing written yet)'}")
         parts.append(f"Consecutive failed test runs: {self.failed_runs}")
         parts.append(
-            "Code allowed this turn: ONE line. The student has tried enough to earn it."
+            "Code allowed this turn: ONE line. Give it this turn."
             if self.code_help == "one_line" else "Code allowed this turn: none."
         )
         if self.countdown_seconds is not None:
