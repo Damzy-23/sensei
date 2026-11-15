@@ -20,9 +20,9 @@ REQUIRED_PATTERNS = {
 }
 
 
-def test_bank_has_twelve_problems_covering_required_patterns() -> None:
+def test_bank_has_fourteen_problems_covering_required_patterns() -> None:
     problems = bank.list_problems()
-    assert len(problems) == 12
+    assert len(problems) == 14
     assert {p.pattern for p in problems} >= REQUIRED_PATTERNS
 
 
@@ -62,10 +62,10 @@ def test_api_response_contains_no_reference_or_hidden_test(problem_id: str) -> N
         assert seed not in text, f"hint seed level {level} leaked to the public view"
 
 
-def test_list_endpoint_returns_twelve_public_summaries() -> None:
+def test_list_endpoint_returns_fourteen_public_summaries() -> None:
     client = TestClient(app)
     body = client.get("/problems").json()
-    assert len(body) == 12
+    assert len(body) == 14
     assert all(set(p) == {"id", "title", "difficulty", "pattern"} for p in body)
 
 

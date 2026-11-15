@@ -131,7 +131,7 @@ def test_mastery_persists_across_updates() -> None:
 def test_next_problem_targets_weakest_pattern() -> None:
     sid = state.create_session()
     for pattern in ["hash map", "stack", "heap", "two pointers", "sliding window", "binary search",
-                    "intervals", "BFS/DFS", "dynamic programming"]:
+                    "intervals", "BFS/DFS", "dynamic programming", "linked traversal"]:
         state.set_mastery(sid, pattern, 0.9)
     state.set_mastery(sid, "heap", 0.05)
     pid = planner.select_next_problem(sid)

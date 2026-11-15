@@ -717,5 +717,106 @@
       "4": "Push each number onto a min-heap. Whenever the heap grows past k, pop the smallest. At the end the heap top is the k-th largest.",
       "5": "import heapq\n\ndef find_kth_largest(nums, k):\n    heap = []\n    for n in nums:\n        # push n\n        # if the heap is larger than k: pop\n    return heap[0]\n"
     }
+  },
+  {
+    "id": "rate-limiter",
+    "title": "Sliding-Window Rate Limiter",
+    "difficulty": "medium",
+    "pattern": "sliding window",
+    "statement": "You are building the request limiter for an API gateway. Given a list of request timestamps `timestamps` (in seconds, non-decreasing), a limit `limit` and a window `window` (in seconds), return a list of booleans, one per request: `True` if the request is allowed, `False` if it is rejected. A request is allowed if fewer than `limit` allowed requests fall in the last `window` seconds. An allowed request at time `t` still counts at `t + window - 1` but no longer counts at `t + window`. Rejected requests do not count.",
+    "starter_code": "def rate_limit(timestamps: list[int], limit: int, window: int) -> list[bool]:\n    # your code here\n    pass\n",
+    "expected_complexity": "O(n) time, O(limit) space",
+    "reference_solution": "from collections import deque\n\ndef rate_limit(timestamps, limit, window):\n    recent = deque()\n    out = []\n    for t in timestamps:\n        while recent and recent[0] <= t - window:\n            recent.popleft()\n        if len(recent) < limit:\n            recent.append(t)\n            out.append(True)\n        else:\n            out.append(False)\n    return out\n",
+    "visible_tests": [
+      {
+        "name": "example 1",
+        "input": "timestamps=[1,2,3,4,5], limit=2, window=10",
+        "call": "rate_limit([1,2,3,4,5], 2, 10)",
+        "expected": "[True, True, False, False, False]"
+      },
+      {
+        "name": "window expires",
+        "input": "timestamps=[0,1,5,6], limit=1, window=5",
+        "call": "rate_limit([0,1,5,6], 1, 5)",
+        "expected": "[True, False, True, False]"
+      }
+    ],
+    "hidden_tests": [
+      {
+        "name": "empty",
+        "call": "rate_limit([], 3, 10)",
+        "expected": "[]"
+      },
+      {
+        "name": "boundary exactly one window later",
+        "call": "rate_limit([0,5], 1, 5)",
+        "expected": "[True, True]"
+      },
+      {
+        "name": "rejected requests do not count",
+        "call": "rate_limit([0,1,2,6], 2, 5)",
+        "expected": "[True, True, False, True]"
+      },
+      {
+        "name": "all allowed",
+        "call": "rate_limit([0,10,20], 1, 5)",
+        "expected": "[True, True, True]"
+      },
+      {
+        "name": "burst then recovery",
+        "call": "rate_limit([0,0,0,1,6,6], 2, 5)",
+        "expected": "[True, True, False, False, True, True]"
+      }
+    ],
+    "hint_seeds": {
+      "1": "A gateway allows a burst, then blocks until old requests age out. What information decides whether a new request is allowed?",
+      "2": "Keep the timestamps of allowed requests that are still inside the window. A sliding window of times, not a fixed bucket, gives the right boundary.",
+      "3": "Before checking the limit at time t, which stored timestamps have fallen out of the window? Remove them from the front, since they are the oldest.",
+      "4": "Walk the timestamps in order. Drop old allowed times from the front of a deque, then allow the request only if the deque is shorter than limit. Append it when allowed.",
+      "5": "from collections import deque\n\ndef rate_limit(timestamps, limit, window):\n    recent = deque()\n    out = []\n    for t in timestamps:\n        # drop times <= t - window from the front\n        # if len(recent) < limit: allow and append\n        # else: reject\n    return out\n"
+    }
+  },
+  {
+    "id": "paginated-fetch",
+    "title": "Collect All Items From a Paginated API",
+    "difficulty": "medium",
+    "pattern": "linked traversal",
+    "statement": "A paginated API returns one page at a time. Each page is a dict with `items` (a list) and `next` (the number of the next page, or `None` on the last page). You are given `get_page`, a function that takes a page number and returns that page's dict. Starting from page 1, collect the items of every page in order and return them as one flat list. Stop when `next` is `None`.",
+    "starter_code": "def fetch_all_items(get_page) -> list:\n    # your code here\n    pass\n",
+    "expected_complexity": "O(total items) time, O(pages) space",
+    "reference_solution": "def fetch_all_items(get_page):\n    items = []\n    seen = set()\n    page = 1\n    while page is not None:\n        data = get_page(page)\n        items.extend(data['items'])\n        page = data['next']\n    return items\n",
+    "visible_tests": [
+      {
+        "name": "three pages",
+        "input": "pages 1->2->3 with items [a],[b,c],[d]",
+        "call": "fetch_all_items(lambda n: {1: {'items': ['a'], 'next': 2}, 2: {'items': ['b', 'c'], 'next': 3}, 3: {'items': ['d'], 'next': None}}[n])",
+        "expected": "['a', 'b', 'c', 'd']"
+      },
+      {
+        "name": "single page",
+        "input": "one page with items [x]",
+        "call": "fetch_all_items(lambda n: {1: {'items': ['x'], 'next': None}}[n])",
+        "expected": "['x']"
+      }
+    ],
+    "hidden_tests": [
+      {
+        "name": "empty pages are kept in order",
+        "call": "fetch_all_items(lambda n: {1: {'items': [], 'next': 2}, 2: {'items': [1], 'next': None}}[n])",
+        "expected": "[1]"
+      },
+      {
+        "name": "pages may skip numbers",
+        "call": "fetch_all_items(lambda n: {1: {'items': [1], 'next': 5}, 5: {'items': [2], 'next': None}}[n])",
+        "expected": "[1, 2]"
+      }
+    ],
+    "hint_seeds": {
+      "1": "You need every page, but you only know the first one. What tells you where to go next?",
+      "2": "Follow the `next` pointer, starting at page 1, and add each page's items to a list until `next` is None.",
+      "3": "Each page tells you the next one. What value marks the end of the chain, and where does the first request start?",
+      "4": "Keep a page number and a result list. While the page is not None: fetch it, extend the result with its items, then move to its `next`.",
+      "5": "def fetch_all_items(get_page):\n    items = []\n    page = 1\n    while page is not None:\n        # fetch page with get_page(page)\n        # extend items with that page's items\n        # page = that page's next\n    return items\n"
+    }
   }
 ]
