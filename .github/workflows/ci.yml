@@ -8,7 +8,8 @@ on:
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Never cancel a run on the deploy branch halfway through a deploy; later pushes queue.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/architecture-layout' }}
 
 jobs:
   api:

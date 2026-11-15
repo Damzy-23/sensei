@@ -145,6 +145,8 @@ export function Inspector() {
   const visibleRows = rows.filter((row) => matches(filter, row.event));
   const selected =
     rows.find((row) => row.event.event_id === selectedEvent)?.event ??
+    // Open on the most telling step: the last one that records a decision and its reason.
+    [...visibleRows].reverse().find((row) => row.event.decision && row.event.reason)?.event ??
     visibleRows[visibleRows.length - 1]?.event ??
     null;
 

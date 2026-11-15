@@ -116,8 +116,19 @@ export function CvStudio() {
         </form>
 
         <section aria-label="CV preview" aria-live="polite" style={{ flex: "2 1 520px", minWidth: 320, display: "flex", flexDirection: "column", gap: 14 }}>
-          {result.status === "empty" && <div className="card muted">Paste a job description and your CV to begin</div>}
-          {result.status === "busy" && <div className="card muted">Reading the job and your CV. This takes a few seconds…</div>}
+          {result.status === "empty" && (
+            <div className="card empty-steps">
+              <div className="label">How it works</div>
+              <ol>
+                <li><span className="step-no">1</span><span><b>Paste the job.</b> The agent pulls out what the role asks for, in its own words.</span></li>
+                <li><span className="step-no">2</span><span><b>Paste your CV.</b> Only what you wrote is used. Nothing is invented, so a gap stays a gap.</span></li>
+                <li><span className="step-no">3</span><span><b>Get a tailored CV.</b> Your experience reordered and reworded for this role, ready to save as a PDF.</span></li>
+              </ol>
+            </div>
+          )}
+          {result.status === "busy" && (
+            <div className="card thinking-card" role="status"><span className="dots" aria-hidden="true"><i /><i /><i /></span>Reading the job and your CV. This takes a few seconds…</div>
+          )}
           {result.status === "error" && <div className="bubble notice" role="alert">The CV could not be tailored: {result.message}</div>}
           {result.status === "ready" && (
             <>
