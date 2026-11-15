@@ -9,7 +9,7 @@ export const AUTH_ON = env.VITE_AUTH !== "off";
 // A Firebase web config is public by design; access is enforced by the API checking the token.
 const firebaseApp = initializeApp({
   apiKey: env.VITE_FIREBASE_API_KEY ?? "AIzaSyCaKC_9ca_rHwSAEjR8V5vy81VyjEkiWhg",
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? "senior-coach.web.app",
+  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? "senior-coach-ai.web.app",
   projectId: env.VITE_FIREBASE_PROJECT_ID ?? "glo-ai-3e547",
   appId: env.VITE_FIREBASE_APP_ID ?? "1:40946072816:web:21757e595177b6db721635",
 });
