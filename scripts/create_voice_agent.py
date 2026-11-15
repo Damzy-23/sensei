@@ -22,7 +22,7 @@ from dotenv import load_dotenv
 ROOT = Path(__file__).resolve().parent.parent
 API = "https://api.elevenlabs.io/v1/convai/agents"
 ALLOWED_HOSTS = ["senior-coach-1115-29b5.web.app", "senior-coach-1115-29b5.firebaseapp.com", "localhost:5173"]
-FIRST_MESSAGE = "Hi, I'm Senior. Tell me what you'd like to work on, or ask me for a hint."
+FIRST_MESSAGE = "Hello. Before we begin, what should I call you?"
 
 
 def tools() -> list[dict]:
@@ -50,10 +50,18 @@ def main() -> int:
     body = {
         "name": "Senior voice guide",
         # Signed URLs only: a session must be started by our server, and only from these origins.
-        "platform_settings": {"auth": {"enable_auth": True, "allowlist": [{"hostname": h} for h in ALLOWED_HOSTS]}},
+        "platform_settings": {
+            "auth": {"enable_auth": True, "allowlist": [{"hostname": h} for h in ALLOWED_HOSTS]},
+            # The browser may choose the voice for a personality, and nothing else.
+            "overrides": {"conversation_config_override": {"tts": {"voice_id": True}}},
+        },
         "conversation_config": {
             "agent": {
-                "first_message": FIRST_MESSAGE,
+                "first_message": "{{first_line}}",
+                "dynamic_variables": {"dynamic_variable_placeholders": {
+                    "user_name": "unknown", "first_line": FIRST_MESSAGE,
+                    "persona_style": "A calm, clear senior engineer.",
+                }},
                 "language": "en",
                 "prompt": {"prompt": (ROOT / "app/prompts/voice_guide.md").read_text(encoding="utf-8"), "tools": tools()},
             }
