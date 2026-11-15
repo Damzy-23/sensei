@@ -20,6 +20,10 @@ from typing import Any
 
 import httpx
 
+import logging
+
+from app.config import get_settings
+from app.llm import replay
 from app.llm.models import ModelNotConfigured, ModelTarget, resolve
 from app.models import Actor
 from app.tracing.context import span
@@ -126,7 +130,7 @@ def _check_required(data: dict[str, Any], json_schema: dict[str, Any] | None) ->
     return all(key in data for key in json_schema.get("required", []))
 
 
-async def call(
+async def _call_live(
     model_key: str,
     system: str,
     messages: list[dict[str, str]],
@@ -136,7 +140,7 @@ async def call(
     json_schema: dict[str, Any] | None = None,
     max_tokens: int = 800,
 ) -> LLMResult:
-    """One traced model call. Raises LLMError (or LLMJSONError) when it cannot recover."""
+    """One live traced model call. Raises LLMError (or LLMJSONError) when it cannot recover."""
     try:
         target = resolve(model_key)
     except ModelNotConfigured as exc:
@@ -218,3 +222,52 @@ async def call(
         repaired=repaired,
         notes=notes,
     )
+
+
+_log = logging.getLogger("sensei.demo")
+
+
+async def call(
+    model_key: str,
+    system: str,
+    messages: list[dict[str, str]],
+    *,
+    actor: Actor,
+    name: str,
+    json_schema: dict[str, Any] | None = None,
+    max_tokens: int = 800,
+) -> LLMResult:
+    """Traced model call. In DEMO_MODE, successful replies are cached, and a failed call is
+    answered from the cache when the same request was seen before. A replay is logged to the
+    console and to the trace."""
+    demo = get_settings().demo_mode
+    try:
+        result = await _call_live(model_key, system, messages, actor=actor, name=name,
+                                  json_schema=json_schema, max_tokens=max_tokens)
+    except LLMError as exc:
+        cached = replay.get(model_key, system, messages) if demo else None
+        if cached is None:
+            raise
+        _log.warning("DEMO_MODE: live %s call failed (%s); replaying cached reply for %s", model_key, exc, name)
+        with span(actor, "llm.call", name, input_text=json.dumps(messages, ensure_ascii=False)) as st:
+            st.model = cached["model"]
+            st.status = "retried"
+            st.output = f"DEMO_MODE replay: live call failed ({exc}); cached reply used"
+        return LLMResult(
+            text=cached["text"],
+            data=cached.get("data"),
+            model=cached["model"],
+            tokens_in=0,
+            tokens_out=0,
+            attempts=0,
+            repaired=False,
+            notes=["replayed from DEMO_MODE cache"],
+        )
+
+    if demo:
+        replay.put(model_key, system, messages, {
+            "text": result.text,
+            "data": result.data,
+            "model": result.model,
+        })
+    return result
