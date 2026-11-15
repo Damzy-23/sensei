@@ -99,7 +99,7 @@ function Control() {
         <>
           <label className="dim voice-label" htmlFor="voice-name">Your name</label>
           <input id="voice-name" className="input voice-name" value={name}
-            placeholder="or say it" onChange={(e) => setName(e.target.value)} />
+            placeholder="Your name" onChange={(e) => setName(e.target.value)} />
           <label className="dim voice-label" htmlFor="voice-persona">Coach</label>
           <select id="voice-persona" className="select voice-persona" value={personaId}
             title={personas[personaId].blurb} onChange={(e) => setPersonaId(e.target.value as PersonaId)}>

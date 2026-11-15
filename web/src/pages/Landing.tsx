@@ -90,7 +90,7 @@ const COMING: string[] = [
 const sectionWrap: CSSProperties = { width: "100%", maxWidth: 1240, margin: "0 auto", padding: "0 clamp(16px, 4vw, 56px)" };
 const well: CSSProperties = { flex: "1 1 280px", minWidth: 0, padding: 22, borderRadius: 20, background: "var(--well)", border: "1px solid var(--line)" };
 
-function Logo() {
+export function Logo() {
   return (
     <span className="brand-mark" style={{ width: 42, height: 42 }}>
       <svg width="25" height="29" viewBox="380 230 520 720" aria-hidden="true">
