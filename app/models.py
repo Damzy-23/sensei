@@ -19,6 +19,7 @@ Actor = Literal[
     "interviewer",
     "caller",
     "observer",
+    "job_analyst",
     "cv_writer",
     "hint_coach",
     "evaluator",

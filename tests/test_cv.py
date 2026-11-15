@@ -68,7 +68,10 @@ def test_tailor_returns_the_cv_fields_and_a_trace_id(client: TestClient, model: 
     assert r.status_code == 200
     body = r.json()
     assert body["trace_id"].startswith("trc_")
+    # Each role now also carries rule-based scores for its bullets; the tailored fields are unchanged.
+    scores = [role.pop("bullet_scores") for role in body["experience"]]
     assert {k: body[k] for k in TAILORED} == TAILORED
+    assert [len(per_role) for per_role in scores] == [len(role["bullets"]) for role in TAILORED["experience"]]
     assert body["gaps"] == ["SQL", "Kubernetes"]  # what the CV lacks is reported, not added
     assert "Kubernetes" not in body["skills"]
     assert JOB in model.calls[0][1] and CV in model.calls[0][1]  # the model saw both texts

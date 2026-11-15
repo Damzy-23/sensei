@@ -49,7 +49,27 @@ def _validate(data: dict[str, Any]) -> dict[str, Any]:
                 "bullets": _strings(job.get("bullets"), f"experience[{index}].bullets"),
             }
         )
+    out["suggested_lines"] = _drafts(data.get("suggested_lines"))
     return out
+
+
+def _drafts(value: Any) -> list[dict[str, str]]:
+    """Keep only drafts that carry a [blank]. A draft with no blank reads as a finished claim
+    about the candidate, which is exactly what this agent may not write."""
+    drafts = []
+    for item in value if isinstance(value, list) else []:
+        if not isinstance(item, dict):
+            continue
+        gap, draft, question = (str(item.get(key) or "").strip() for key in ("gap", "draft", "question"))
+        if draft and has_blank(draft):
+            drafts.append({"gap": gap, "draft": draft, "question": question})
+    return drafts[:4]
+
+
+def has_blank(text: str) -> bool:
+    """True when the text still has a [bracketed] blank to fill in."""
+    start = text.find("[")
+    return start != -1 and text.find("]", start + 2) != -1
 
 
 async def tailor(job_description: str, cv_text: str) -> dict[str, Any]:
