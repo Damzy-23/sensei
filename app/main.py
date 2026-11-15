@@ -14,6 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import eval as eval_routes
 from app.api.auth import require_user
+from app.api import logs
 from app.api import cv, mentor, problems, sessions, traces, tracks, voice
 
 app = FastAPI(title="Senior API", version="0.1.0")
@@ -26,7 +27,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (sessions, problems, tracks, traces, mentor, voice, cv, eval_routes):
+for module in (sessions, problems, tracks, traces, mentor, voice, cv, logs, eval_routes):
     app.include_router(module.router, dependencies=[Depends(require_user)])
 
 
@@ -40,5 +41,5 @@ def health() -> dict[str, str]:
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 if WEB_DIST.is_dir():
     app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
-for module in (sessions, problems, tracks, traces, mentor, voice, cv, eval_routes):
+for module in (sessions, problems, tracks, traces, mentor, voice, cv, logs, eval_routes):
     app.include_router(module.router)

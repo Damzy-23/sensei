@@ -6,6 +6,7 @@ import asyncio
 from collections import defaultdict
 
 from app.db import get_conn, write_lock
+from app.tracing import archive
 from app.models import TraceEvent, TraceNode
 
 COLUMNS: list[str] = list(TraceEvent.model_fields)
@@ -30,6 +31,7 @@ def emit(ev: TraceEvent) -> None:
     placeholders = ",".join("?" for _ in COLUMNS)
     with write_lock:
         get_conn().execute(f"INSERT INTO events ({','.join(COLUMNS)}) VALUES ({placeholders})", values)
+    archive.mirror(ev)
     for queue in tuple(_SUBSCRIBERS.get(ev.session_id, ())):
         try:
             queue.put_nowait(ev)
@@ -64,6 +66,15 @@ def load_session_events(session_id: str, limit: int = 200) -> list[TraceEvent]:
         (session_id, limit),
     ).fetchall()
     return [TraceEvent(**dict(row)) for row in reversed(rows)]
+
+
+def recent_events(limit: int = 500) -> list[TraceEvent]:
+    """Across all sessions, newest first: from Firestore when archiving is on (it outlives
+    restarts), otherwise from the local table."""
+    if archive.enabled():
+        return archive.recent(limit)
+    rows = get_conn().execute("SELECT * FROM events ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
+    return [TraceEvent(**dict(row)) for row in rows]
 
 
 def build_tree(events: list[TraceEvent]) -> list[TraceNode]:

@@ -174,3 +174,31 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .glass-item { padding: 12px; border-radius: 14px; background: rgba(12, 22, 29, 0.6); border: 1px solid var(--border-soft); animation: fade 0.35s var(--ease) both; }
 .glass-cell { min-width: 40px; height: 40px; padding: 0 8px; display: flex; align-items: center; justify-content: center; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); font: 500 14px var(--mono); }
 .glass-cell[data-pointed] { border-color: var(--sky); box-shadow: 0 0 0 3px rgba(134, 187, 216, 0.18); }
+
+/* ---- Activity log ---- */
+.log-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; }
+.agent-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.agent-tile { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--border); background: var(--surface); color: var(--text); min-height: 44px; transition: all 0.2s var(--ease); }
+.agent-tile:hover { background: var(--hover); }
+.agent-tile.on { border-color: var(--baltic); background: rgba(107, 159, 224, 0.1); }
+.agent-name { font: 600 15px var(--display); text-transform: capitalize; }
+.agent-meta { font-size: 11px; color: var(--text-3); }
+.log-list { list-style: none; margin: 0; padding: 0; }
+.log-list li + li { border-top: 1px solid var(--line); }
+.log-row { width: 100%; display: grid; grid-template-columns: 76px minmax(0, 140px) minmax(0, 1fr) minmax(0, 150px) 64px 64px 70px; align-items: center; gap: 12px; padding: 10px 16px; background: none; border: 0; color: var(--text); text-align: left; font: 400 13px var(--body); min-height: 44px; }
+.log-row:hover { background: rgba(255, 255, 255, 0.025); }
+.log-row .chip { justify-self: start; max-width: 100%; overflow: hidden; text-overflow: ellipsis; text-transform: capitalize; }
+.log-time { font-size: 11px; }
+.log-what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-what .dim { font-size: 11px; }
+.log-model { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.log-num { font-size: 12px; text-align: right; color: var(--text-2); }
+.log-row .pill { justify-self: end; }
+.log-detail { padding: 4px 16px 14px 104px; font-size: 13px; color: var(--text-2); overflow-wrap: anywhere; }
+.log-detail p { margin: 6px 0; } .log-detail .label { margin-right: 8px; }
+@media (max-width: 760px) {
+  .log-row { grid-template-columns: 64px minmax(0, 1fr) auto; grid-template-areas: "time who status" "what what what"; row-gap: 4px; }
+  .log-row .log-time { grid-area: time; } .log-row .chip { grid-area: who; } .log-row .pill { grid-area: status; }
+  .log-row .log-what { grid-area: what; } .log-row .log-model, .log-row .log-num { display: none; }
+  .log-detail { padding-left: 16px; }
+}

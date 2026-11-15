@@ -5,6 +5,7 @@ import { useAuth } from "./auth";
 import { Blitz } from "./pages/Blitz";
 import { CvStudio } from "./pages/CvStudio";
 import { Inspector } from "./pages/Inspector";
+import { Logs } from "./pages/Logs";
 import { Mentor } from "./pages/Mentor";
 import { Tracks } from "./pages/Tracks";
 import { Workspace } from "./pages/Workspace";
@@ -16,6 +17,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: "cv", label: "CV studio" },
   { id: "inspector", label: "Agent inspector" },
   { id: "mentor", label: "Mentor" },
+  { id: "logs", label: "Activity log" },
 ];
 
 function Logo() {
@@ -62,6 +64,7 @@ export function App() {
       {page === "cv" && <CvStudio />}
       {page === "inspector" && <Inspector />}
       {page === "mentor" && <Mentor />}
+      {page === "logs" && <Logs />}
       <Glass />
     </div>
   );

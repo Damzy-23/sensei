@@ -6,10 +6,10 @@ import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
 const app = initializeApp({
-  apiKey: "AIzaSyD36I9lW38Bctmm7DBzFe_UeBEuIpOpnnk",
-  authDomain: "senior-coach-1115-29b5.firebaseapp.com",
-  projectId: "senior-coach-1115-29b5",
-  appId: "1:257917415532:web:762511e14b9ad9f1d6a849",
+  apiKey: "AIzaSyCaKC_9ca_rHwSAEjR8V5vy81VyjEkiWhg",
+  authDomain: "senior-coach-ai.web.app",
+  projectId: "glo-ai-3e547",
+  appId: "1:40946072816:web:21757e595177b6db721635",
 });
 
 export const auth = getAuth(app);

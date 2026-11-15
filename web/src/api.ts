@@ -1,5 +1,8 @@
 // Typed client for the Senior API. Shapes mirror docs/API.md.
-import { idToken } from "./auth";
+import { auth } from "./firebase";
+
+/** The signed-in user's ID token, or null for a guest. */
+const idToken = async (): Promise<string | null> => (auth.currentUser ? auth.currentUser.getIdToken() : null);
 
 // Same origin in a production build (FastAPI serves the app); the local API in dev.
 export const API_URL: string = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:8000" : "");
@@ -67,6 +70,10 @@ export const listTickets = () => request<Ticket[]>("/mentor/tickets");
 export const getTicket = (ticketId: string) => request<TicketDetail>(`/mentor/tickets/${ticketId}`);
 export const replyTicket = (ticketId: string, text: string) => post<ChatMessage>(`/mentor/tickets/${ticketId}/reply`, { text });
 export const startVoiceSession = () => post<{ signed_url: string; agent_id: string }>("/voice/session");
+export interface ActorSummary { actor: string; events: number; model_calls: number; tool_calls: number; blocked: number; errors: number; tokens_in: number; tokens_out: number; cost_usd: number }
+export interface ActivityLog { events: TraceEvent[]; summary: ActorSummary[]; durable: boolean }
+export const getLogs = (filter: { actor?: string; type?: string }) =>
+  request<ActivityLog>(`/logs?${new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][])}`);
 export const resolveTicket = (ticketId: string) => post<Ticket>(`/mentor/tickets/${ticketId}/resolve`);
 
 /** Send a student message. Trace events arrive through `onTrace` as the agents work;
