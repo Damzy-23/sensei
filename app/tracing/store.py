@@ -17,7 +17,8 @@ class TraceValidationError(ValueError):
 
 
 def validate(ev: TraceEvent) -> None:
-    needs_reason = ev.actor == "guard" or ev.type == "mode.decision"
+    # Decision events only: a guard's own model call is an llm.call and carries usage, not a verdict.
+    needs_reason = ev.type in {"guard.input", "guard.output", "mode.decision"}
     if needs_reason and ev.status != "error" and (not ev.decision or not ev.reason):
         raise TraceValidationError(f"{ev.type} '{ev.name}' must include decision and reason")
 

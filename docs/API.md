@@ -1,7 +1,9 @@
 # Sensei API
 
 Base URL (dev): `http://localhost:8000`. All bodies are JSON. CORS is open for development.
-Phase 1 responses are **stub data**; shapes are final and will not change without a note here.
+With `SENSEI_USE_STUBS=1` (the default) responses are **stub data**. With `SENSEI_USE_STUBS=0` the
+session, trace, track and mentor endpoints run the real orchestrator; `/eval/results` is still a stub.
+Shapes are the same in both modes and will not change without a note here.
 
 Interactive docs once the server runs: `http://localhost:8000/docs`.
 
@@ -35,6 +37,8 @@ Run: `uvicorn app.main:app --reload --port 8000`
 ## Sessions
 
 ### `POST /sessions` → 201
+Optional body: `{ "mode": "learn" }` (`learn` by default, or `interview`, `blitz`). The mode decides
+which agent answers: the hint coach in `learn`, the interviewer in `interview` and `blitz`.
 ```json
 { "session_id": "ses_3f9a1c0d2e4b" }
 ```
@@ -143,6 +147,31 @@ Phase 3 will return 12 problems across two pointers, sliding window, hash map, s
   "visible_tests": [
     { "name": "example 1", "input": "nums=[2,7,11,15], target=9", "expected": "[0, 1]" },
     { "name": "duplicates", "input": "nums=[3,3], target=6", "expected": "[0, 1]" }
+  ]
+}
+```
+
+---
+
+## Tracks
+
+### `GET /tracks` → 200
+```json
+[
+  { "id": "blind_75", "title": "Blind 75", "count": 75 },
+  { "id": "neetcode_150", "title": "NeetCode 150", "count": 150 }
+]
+```
+
+### `GET /tracks/{track_id}` → 200 | 404
+The summary fields plus `problems`. `runnable` is true when the problem has a full statement,
+starter code and visible tests (`GET /problems/{id}` works for it). Any track problem can be
+used as `problem_id` in a session, runnable or not.
+```json
+{
+  "id": "blind_75", "title": "Blind 75", "count": 75,
+  "problems": [
+    { "id": "two-sum", "title": "Two Sum", "difficulty": "easy", "pattern": "arrays", "runnable": true }
   ]
 }
 ```

@@ -14,6 +14,8 @@ import pytest
 APP = Path(__file__).resolve().parent.parent / "app"
 
 MODEL_SDKS = {"anthropic", "openai"}
+# The one module agents may share: the context type they are all handed. It holds no behaviour.
+SHARED_AGENT_MODULES = {"app.agents.context"}
 
 
 def _modules(package: str | None = None) -> list[Path]:
@@ -78,6 +80,7 @@ def test_agents_do_not_import_each_other() -> None:
     for path in _modules("agents"):
         own = f"app.agents.{path.stem}"
         for name in _imports(path):
-            if name.startswith("app.agents.") and not name.startswith(own):
+            shared = any(name == m or name.startswith(m + ".") for m in SHARED_AGENT_MODULES)
+            if name.startswith("app.agents.") and not name.startswith(own) and not shared:
                 offenders.append(f"{path.relative_to(APP)} -> {name}")
     assert offenders == [], f"agents must cooperate through the orchestrator: {offenders}"

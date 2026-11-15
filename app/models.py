@@ -69,6 +69,24 @@ class ProblemDetail(Problem):
 # ---------- sessions and messages ----------
 
 
+class TrackProblem(Problem):
+    runnable: bool = Field(description="True when a full statement, starter code and tests exist.")
+
+
+class TrackSummary(BaseModel):
+    id: str
+    title: str
+    count: int
+
+
+class Track(TrackSummary):
+    problems: list[TrackProblem]
+
+
+class SessionCreateIn(BaseModel):
+    mode: Mode = "learn"
+
+
 class SessionCreated(BaseModel):
     session_id: str
 

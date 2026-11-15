@@ -1,72 +1,124 @@
-"""Session routes: create, message (SSE), test runs, state, live trace stream."""
+"""Session routes: create, message (SSE), test runs, state, live trace stream.
+
+With SENSEI_USE_STUBS=1 these serve the Phase 1 stub data; otherwise they call
+the orchestrator.
+"""
 
 from __future__ import annotations
 
 import asyncio
 from collections.abc import AsyncIterator
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
-from app import stubs
+from app import catalog, stubs
 from app.api.sse import sse
-from app.models import FinalEvent, MessageIn, RunIn, RunOut, SessionCreated, SessionState
+from app.config import get_settings
+from app.memory import repository as memory
+from app.models import FinalEvent, MessageIn, RunIn, RunOut, SessionCreated, SessionCreateIn, SessionState
+from app.orchestrator import turn as orchestrator
+from app.tracing import store
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 
 
+def _stubbed() -> bool:
+    return get_settings().use_stubs
+
+
 def _require_session(session_id: str) -> None:
-    if not stubs.session_exists(session_id):
+    exists = stubs.session_exists(session_id) if _stubbed() else memory.get_session(session_id) is not None
+    if not exists:
         raise HTTPException(status_code=404, detail="session not found")
 
 
 def _require_problem(problem_id: str) -> None:
-    if stubs.get_problem(problem_id) is None:
+    found = stubs.get_problem(problem_id) if _stubbed() else catalog.find_problem(problem_id)
+    if found is None:
         raise HTTPException(status_code=404, detail="problem not found")
 
 
 @router.post("", status_code=201, response_model=SessionCreated)
-async def create_session() -> SessionCreated:
-    return SessionCreated(session_id=stubs.create_session())
+async def create_session(body: SessionCreateIn | None = None) -> SessionCreated:
+    if _stubbed():
+        return SessionCreated(session_id=stubs.create_session())
+    return SessionCreated(session_id=memory.create_session(body.mode if body else "learn").session_id)
+
+
+async def _stub_message_stream(session_id: str) -> AsyncIterator[str]:
+    for ev in stubs.stub_trace_events(session_id):
+        yield sse("trace", ev)
+        await asyncio.sleep(0.05)  # simulate streaming latency
+    final: FinalEvent = stubs.stub_final(session_id)
+    yield sse("final", final)
+
+
+async def _message_stream(session_id: str, body: MessageIn) -> AsyncIterator[str]:
+    """Run the turn and forward its trace events as they are written, then the final event."""
+    queue = store.subscribe(session_id)
+    task = asyncio.create_task(orchestrator.run_turn(session_id, body))
+    try:
+        while not (task.done() and queue.empty()):
+            try:
+                yield sse("trace", await asyncio.wait_for(queue.get(), timeout=0.1))
+            except asyncio.TimeoutError:
+                continue
+        try:
+            yield sse("final", task.result())
+        except orchestrator.TurnError as exc:
+            yield sse("error", {"message": str(exc), "trace_id": exc.trace_id})
+    finally:
+        store.unsubscribe(session_id, queue)
+        if not task.done():
+            task.cancel()
 
 
 @router.post("/{session_id}/message")
 async def post_message(session_id: str, body: MessageIn) -> StreamingResponse:
     _require_session(session_id)
     _require_problem(body.problem_id)
-
-    async def stream() -> AsyncIterator[str]:
-        for ev in stubs.stub_trace_events(session_id):
-            yield sse("trace", ev)
-            await asyncio.sleep(0.05)  # simulate streaming latency
-        final: FinalEvent = stubs.stub_final(session_id)
-        yield sse("final", final)
-
-    return StreamingResponse(stream(), media_type="text/event-stream")
+    stream = _stub_message_stream(session_id) if _stubbed() else _message_stream(session_id, body)
+    return StreamingResponse(stream, media_type="text/event-stream")
 
 
 @router.post("/{session_id}/runs", response_model=RunOut)
 async def post_run(session_id: str, body: RunIn) -> RunOut:
     _require_session(session_id)
     _require_problem(body.problem_id)
-    return stubs.stub_run_out(body)
+    return stubs.stub_run_out(body) if _stubbed() else orchestrator.run_report(session_id, body)
 
 
 @router.get("/{session_id}/state", response_model=SessionState)
 async def get_state(session_id: str) -> SessionState:
     _require_session(session_id)
-    return stubs.stub_state(session_id)
+    if _stubbed():
+        return stubs.stub_state(session_id)
+    return orchestrator.state(memory.get_session(session_id))  # type: ignore[arg-type]
 
 
 @router.get("/{session_id}/events")
-async def session_events(session_id: str) -> StreamingResponse:
-    """Live trace stream for the agent inspector. Phase 1 stub: replays one turn then ends."""
+async def session_events(session_id: str, request: Request) -> StreamingResponse:
+    """Live trace stream for the agent inspector: stored events first, then new ones as written."""
     _require_session(session_id)
 
-    async def stream() -> AsyncIterator[str]:
+    async def stub_stream() -> AsyncIterator[str]:
         for ev in stubs.stub_trace_events(session_id):
             yield sse("trace", ev)
             await asyncio.sleep(0.02)
         yield sse("end", {"reason": "stub replay complete"})
 
-    return StreamingResponse(stream(), media_type="text/event-stream")
+    async def live_stream() -> AsyncIterator[str]:
+        queue = store.subscribe(session_id)
+        try:
+            for ev in store.load_session_events(session_id):
+                yield sse("trace", ev)
+            while not await request.is_disconnected():
+                try:
+                    yield sse("trace", await asyncio.wait_for(queue.get(), timeout=1.0))
+                except asyncio.TimeoutError:
+                    yield ": keep-alive\n\n"
+        finally:
+            store.unsubscribe(session_id, queue)
+
+    return StreamingResponse(stub_stream() if _stubbed() else live_stream(), media_type="text/event-stream")

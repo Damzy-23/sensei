@@ -12,9 +12,12 @@ the cross-cutting parts that are not one of the six, and the requirements.
 The API contract is in [API.md](API.md). Decisions and their reasons are in
 [adr/](adr/).
 
-**Status (Phase 1).** The API, the contract tests, the layering tests and the
-tracing foundations are built. Agents, guards, tools, memory and the
-orchestrator are defined here and stubbed in code. Each row below says which.
+**Status.** The turn loop is built and tested end to end against a scripted
+model: input guard, agent selection, hint ladder, hint coach and interviewer,
+leak check with rewrite, escalation to a mentor, and test-run handling, all
+traced. It runs when `SENSEI_USE_STUBS=0`. Not built yet: the evaluator and
+planner agents, the eval harness, and full statements for most track problems.
+Each row below says which.
 
 ## One turn, end to end
 
@@ -27,6 +30,7 @@ flowchart LR
     M -->|learn| HC[hint_coach]
     M -->|interview| IV[interviewer]
     M -->|blitz| IV
+    M -. learn only .-> L[hint ladder<br/>level 0-5]
     HC --> GO[guard: leak check]
     IV --> GO
     GO -->|blocked: rewrite| HC
@@ -47,22 +51,22 @@ never call each other.
 
 | Block | What it means here | Where | Status |
 |---|---|---|---|
-| **Role-playing** | Four specialists, each with one role: `interviewer`, `hint_coach` (Socratic hints at levels 1–5), `evaluator`, `planner`. A fifth role, `mentor`, is a human. | `app/agents/`, `app/prompts/` (one versioned file per role) | Defined; stubbed |
-| **Focus** | The mode decision picks which agent may act. The hint ladder caps what the coach may reveal. Each agent gets only the context its job needs. Fast model for guards, reasoning model for agents. | `app/orchestrator/`, `app/agents/` | Defined; stubbed |
-| **Tools** | Typed calls: read problem and visible tests, read the latest run, update mastery, escalate to mentor. Escalation is a tool, so human-in-the-loop is a traced call. | `app/tools/` | Defined; stubbed |
-| **Cooperation** | Supervisor pattern: the orchestrator hands each turn to exactly one specialist and escalates to a human on fixed triggers. | `app/orchestrator/`, `app/api/mentor.py` | Mentor API built on stubs; orchestrator stubbed |
-| **Guardrails** | Input classification, output leak check with rewrite, escalation policy, request validation, no solutions or hidden tests from any endpoint, secret redaction in logs. | `app/guards/`, `app/models.py`, `app/tracing/redact.py` | Validation and redaction built; guards stubbed |
-| **Memory** | Short-term: session state and transcript. Long-term: mastery per pattern. One repository interface over the store. | `app/memory/`, `app/db.py` | SQLite store built; repository stubbed |
+| **Role-playing** | Four specialists, each with one role: `interviewer`, `hint_coach` (Socratic hints at levels 1–5), `evaluator`, `planner`. A fifth role, `mentor`, is a human. | `app/agents/`, `app/prompts/` (one versioned file per role) | `hint_coach` and `interviewer` built; `evaluator` and `planner` not yet |
+| **Focus** | The mode decision picks which agent may act. The hint ladder caps what the coach may reveal. Each agent gets only the context its job needs. Fast model for guards, reasoning model for agents. | `app/orchestrator/rules.py`, `app/agents/context.py` | Built |
+| **Tools** | Typed calls: read problem and visible tests, read the latest run, update mastery, escalate to mentor. Escalation is a tool, so human-in-the-loop is a traced call. | `app/tools/` | `escalate_to_mentor` and `update_mastery` built |
+| **Cooperation** | Supervisor pattern: the orchestrator hands each turn to exactly one specialist and escalates to a human on fixed triggers. | `app/orchestrator/turn.py`, `app/api/mentor.py` | Built |
+| **Guardrails** | Input classification, output leak check with rewrite, escalation policy, request validation, no solutions or hidden tests from any endpoint, secret redaction in logs. | `app/guards/`, `app/models.py`, `app/tracing/redact.py` | Built. The leak check is rule-based |
+| **Memory** | Short-term: session state and transcript. Long-term: mastery per pattern. One repository interface over the store. | `app/memory/repository.py`, `app/db.py` | Built on SQLite. Mastery is per session until accounts exist |
 
 ### Not one of the six
 
 | Part | Why it exists | Where | Status |
 |---|---|---|---|
 | **Observability** | Cost, model and the "why" for every step, streamed live to the inspector and kept for audit | `app/tracing/` | Span context, store, prices, redaction built |
-| **Model gateway** | The single path to a model: model choice, base vs tuned hint model, pricing | `app/llm/` | Stubbed |
+| **Model gateway** | The single path to a model: model choice, base vs tuned hint model, pricing | `app/llm/gateway.py` | Built |
 | **Evaluation** | Tuned vs base hint model: pairwise win rate, leak rate as a hard fail | `app/eval/` | Stubbed; results endpoint built |
-| **HTTP layer** | Routes only, no business rules | `app/api/`, `app/main.py` | Built (stub data) |
-| **Content** | The problem catalogue: data, not agent logic | `app/stubs.py` (moves to data files) | Stub data |
+| **HTTP layer** | Routes only, no business rules | `app/api/`, `app/main.py` | Built |
+| **Content** | The problem catalogue: data, not agent logic | `data/tracks/`, `app/catalog.py`, `app/stubs.py` | Blind 75 and NeetCode 150 listed (title, difficulty, pattern). Two problems have full statements and tests |
 
 ## Layering rules
 
