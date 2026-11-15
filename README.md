@@ -1,5 +1,7 @@
 # Sensei: AI coding-interview coach (backend)
 
+> **Live demo: https://senior-coach-ai.web.app** (try it as a guest, no account needed). The web app and the code behind it are on the [`architecture-layout`](https://github.com/Damzy-23/sensei/tree/architecture-layout) branch.
+
 Sensei gives a student an interview problem, runs their tests in the browser, and coaches them
 through a ladder of hints. It never gives the full solution. It tracks session state and changes
 mode (Learn, Interview, Blitz) with a visible reason. If the student stays stuck, a human mentor
