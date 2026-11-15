@@ -27,6 +27,7 @@ Actor = Literal[
     "mentor",
     "escalation",
     "career_agent",
+    "proctor",
 ]
 EventType = Literal[
     "turn.start",
