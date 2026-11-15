@@ -1,3 +1,4 @@
+import { patternName } from "../labels";
 import { useCallback, useEffect, useState } from "react";
 import { getTrack, type TrackProblem } from "../api";
 
@@ -96,7 +97,7 @@ export function Blitz() {
   const answered = round.picked !== null;
   const correct = round.picked === question.answer;
   const fraction = round.t / SECONDS;
-  const explain = `${question.title} is a ${question.pattern} problem.`;
+  const explain = `${question.title} is a ${patternName(question.pattern).toLowerCase()} problem.`;
   let feedback = "Pick one before the clock runs out.";
   let feedbackColor = "var(--text-2)";
   if (round.done) feedback = `Round over. ${round.right} of ${round.questions.length} right. Press Play again to beat it.`;
@@ -147,7 +148,7 @@ export function Blitz() {
               return (
                 <button key={option} className={`opt ${state}`} disabled={answered || round.done} onClick={() => choose(i)}>
                   <span className="k">{LETTERS[i]}</span>
-                  <span style={{ textTransform: "capitalize", flex: 1 }}>{option}</span>
+                  <span style={{ flex: 1 }}>{patternName(option)}</span>
                   {state === "right" && <span className="pill seafoam">Correct answer</span>}
                   {state === "wrong" && <span className="pill sky">Your pick</span>}
                 </button>

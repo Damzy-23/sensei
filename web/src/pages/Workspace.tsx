@@ -6,8 +6,20 @@ import {
 import { registerTool, type PageSnapshot } from "../agent/tools";
 import { MODE_COLOR, useApp } from "../app-context";
 import { entryPoint, runTests, type TestResult } from "../runner";
+import { CodeEditor, RichText } from "../components/CodeEditor";
+import { patternName } from "../labels";
 
-type Bubble = { id: number; kind: "student" | "coach" | "notice"; text: string };
+type Bubble = { id: number; kind: "student" | "coach" | "notice"; text: string; meta?: string };
+
+// What each rung allows; mirrors app/prompts/hint_coach.md.
+const LADDER = [
+  { level: 1, title: "Clarify the goal", sub: "Restate it, or an input you missed" },
+  { level: 2, title: "Name the area", sub: "A data structure or technique, as a question" },
+  { level: 3, title: "The key insight", sub: "A leading question" },
+  { level: 4, title: "The approach", sub: "In plain words, no code" },
+  { level: 5, title: "Walk an example", sub: "Step by step, still no code" },
+];
+const STARTERS = ["I don't know where to start.", "Is my approach fast enough?", "What am I missing?"];
 type Loaded =
   | { status: "loading" }
   | { status: "error"; message: string }
@@ -54,8 +66,8 @@ export function Workspace() {
   const nextId = useRef(0);
   const chatEnd = useRef<HTMLDivElement>(null);
 
-  const say = useCallback((kind: Bubble["kind"], text: string) => {
-    setBubbles((list) => [...list, { id: nextId.current++, kind, text }]);
+  const say = useCallback((kind: Bubble["kind"], text: string, meta?: string) => {
+    setBubbles((list) => [...list, { id: nextId.current++, kind, text, meta }]);
   }, []);
 
   useEffect(() => {
@@ -86,15 +98,16 @@ export function Workspace() {
 
   const ask = useCallback(async (text: string) => {
     if (!sessionId) throw new Error("The session is not ready yet.");
-    say("student", text);
+    say("student", text, "You");
     setBusy("Reading your message…");
     let steps = 0;
     try {
       const final = await sendMessage(sessionId, { text, problem_id: problemId, code }, (event) => {
         steps += 1;
-        setBusy(`${event.actor}: ${event.name} (${steps} steps so far)`);
+        setBusy(`${event.actor.replace(/_/g, " ")} · ${event.name.replace(/_/g, " ")} · step ${steps}`);
       });
-      say("coach", final.reply);
+      const who = final.mode === "learn" ? "Coach" : "Interviewer";
+      say("coach", final.reply, final.mode === "learn" && final.hint_level > 0 ? `${who} · hint ${final.hint_level} of 5` : who);
       await refresh();
       return { reply: final.reply, hint_level: final.hint_level, escalated: final.escalated };
     } catch (err) {
@@ -194,27 +207,32 @@ export function Workspace() {
                 <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
                   <h1>{loaded.problem.title}</h1>
                   <span className="pill" style={{ color: DIFFICULTY_COLOR[loaded.problem.difficulty] }}>{loaded.problem.difficulty}</span>
-                  <span className="chip" style={{ color: "var(--text-2)" }}>{loaded.problem.pattern}</span>
+                  <span className="chip" style={{ color: "var(--text-2)" }}>{patternName(loaded.problem.pattern)}</span>
                   <button className="btn-ghost" style={{ marginLeft: "auto", height: 36 }} onClick={() => go("tracks")}>Change problem</button>
                 </div>
-                <p className="muted" style={{ margin: "12px 0 0" }}>
-                  {loaded.detail?.statement ?? "No statement is stored for this problem yet. The coach knows it by name: describe your approach and ask for help."}
+                <p className="statement">
+                  {loaded.detail ? <RichText text={loaded.detail.statement} /> : "No statement is stored for this problem yet. The coach knows it by name: describe your approach and ask for help."}
                 </p>
+                {loaded.detail && loaded.detail.visible_tests.length > 0 && (
+                  <div className="examples">
+                    {loaded.detail.visible_tests.slice(0, 2).map((t) => (
+                      <div key={t.name} className="example mono">
+                        <span><span className="dim">input</span> {t.input}</span>
+                        <span><span className="dim">output</span> {t.expected}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </section>
 
           <section className="card" aria-label="Code editor" style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <label className="label" htmlFor="code">Your code (Python)</label>
-            <textarea id="code" className="textarea code" spellCheck={false} value={code} onChange={(e) => setCode(e.target.value)} />
-            {highlight && (
-              <div className="bubble notice" style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <span>Lines {highlight.from}–{highlight.to}: {highlight.note}</span>
-                <button className="btn-ghost" style={{ height: 32, marginLeft: "auto" }} onClick={() => setHighlight(null)}>Dismiss</button>
-              </div>
-            )}
+            <label className="label sr-only" htmlFor="code">Your code (Python)</label>
+            <CodeEditor id="code" value={code} onChange={setCode} filename="solution.py"
+              highlight={highlight} onDismissHighlight={() => setHighlight(null)} />
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12 }}>
-              <button className="btn-ghost" disabled={!detail || running || !sessionId} onClick={() => run().catch(() => undefined)}>
+              <button className="btn-primary" disabled={!detail || running || !sessionId} onClick={() => run().catch(() => undefined)}>
                 {running ? "Running…" : "Run tests"}
               </button>
               {!detail && loaded.status === "ready" && <span className="dim" style={{ fontSize: 12 }}>No runnable tests for this problem yet</span>}
@@ -246,26 +264,45 @@ export function Workspace() {
           </div>
 
           {mode === "learn" && (
-            <div aria-label="Hint ladder" style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              {[1, 2, 3, 4, 5].map((level) => (
-                <div key={level} title={`Hint level ${level}`}
-                  className={`rung ${level < hintLevel ? "used" : level === hintLevel ? "now" : level === hintLevel + 1 ? "ready" : ""}`}>
-                  {level}
-                </div>
-              ))}
-              <div className="rung mentor" title="Mentor: a person steps in when you are still stuck after level 5">M</div>
-              <span className="dim" style={{ fontSize: 12 }}>{hintLevel === 0 ? "No hints used" : `Hint ${hintLevel} of 5`}</span>
-            </div>
+            <ol className="ladder" aria-label={`Hint ladder: ${hintLevel === 0 ? "no hints used" : `hint ${hintLevel} of 5`}`}>
+              {LADDER.map((rung) => {
+                const state = rung.level < hintLevel ? "used" : rung.level === hintLevel ? "now" : rung.level === hintLevel + 1 ? "ready" : "locked";
+                return (
+                  <li key={rung.level} className={`ladder-rung ${state}`}>
+                    <span className={`rung ${state}`}>{rung.level}</span>
+                    <span className="ladder-text"><span className="ladder-title">{rung.title}</span><span className="ladder-sub">{rung.sub}</span></span>
+                    <span className="ladder-tag">{state === "now" ? "Now" : state === "used" ? "Used" : state === "ready" ? "Next" : "Locked"}</span>
+                  </li>
+                );
+              })}
+              <li className={`ladder-rung mentor ${session?.escalated ? "now" : ""}`}>
+                <span className="rung mentor">M</span>
+                <span className="ladder-text"><span className="ladder-title">Mentor review</span><span className="ladder-sub">A person steps in if you are still stuck</span></span>
+                <span className="ladder-tag">{session?.escalated ? "Joined" : "Standby"}</span>
+              </li>
+            </ol>
           )}
 
           <div aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 240, maxHeight: 460, overflowY: "auto" }}>
             {bubbles.length === 0 && (
-              <span className="muted" style={{ fontSize: 13 }}>
-                {mode === "learn" ? "Say what you have tried, or ask for a hint. Hints never include code." : "Explain your approach and its cost before you write code."}
-              </span>
+              <div className="chat-empty">
+                <p className="muted">
+                  {mode === "learn" ? "Say what you have tried, or ask for a hint. Hints never include code." : "Explain your approach and its cost before you write code."}
+                </p>
+                <div className="starters">
+                  {STARTERS.map((text) => (
+                    <button key={text} type="button" className="starter" disabled={!sessionId || !!busy} onClick={() => ask(text).catch(() => undefined)}>{text}</button>
+                  ))}
+                </div>
+              </div>
             )}
-            {bubbles.map((b) => <div key={b.id} className={`bubble ${b.kind}`} role={b.kind === "notice" ? "alert" : undefined}>{b.text}</div>)}
-            {busy && <div className="bubble coach dim mono" style={{ fontSize: 12 }}>{busy}</div>}
+            {bubbles.map((b) => (
+              <div key={b.id} className={`bubble ${b.kind}`} role={b.kind === "notice" ? "alert" : undefined}>
+                {b.meta && <span className="bubble-meta">{b.meta}</span>}
+                {b.text}
+              </div>
+            ))}
+            {busy && <div className="bubble coach thinking" role="status"><span className="dots" aria-hidden="true"><i /><i /><i /></span><span className="mono">{busy}</span></div>}
             <div ref={chatEnd} />
           </div>
 
@@ -284,6 +321,12 @@ export function Workspace() {
               )}
             </div>
           </form>
+          <div className="session-bar mono" aria-label="Session">
+            <span>failed runs <b>{session?.failed_runs ?? 0}</b></span>
+            <span>hints <b>{hintLevel}/5</b></span>
+            <span>mentor <b>{session?.escalated ? "on" : "off"}</b></span>
+            <button className="linklike" onClick={() => go("inspector")}>Open the trace</button>
+          </div>
         </section>
       </div>
     </main>

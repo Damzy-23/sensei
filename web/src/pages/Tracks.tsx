@@ -1,3 +1,4 @@
+import { patternName } from "../labels";
 import { useEffect, useMemo, useState } from "react";
 import { getTrack, listTracks, type Difficulty, type Track, type TrackProblem, type TrackSummary } from "../api";
 import { useApp } from "../app-context";
@@ -74,9 +75,12 @@ export function Tracks() {
         <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }} role="group" aria-label="Track">
           {tracks.data.map((t) => (
             <button key={t.id} className={`filter ${t.id === trackId ? "on" : ""}`} aria-pressed={t.id === trackId} onClick={() => setTrackId(t.id)}>
-              {t.title} <span className="mono dim">{t.count}</span>
+              {t.title}{!t.title.includes(String(t.count)) && <span className="mono dim"> {t.count}</span>}
             </button>
           ))}
+          <span className="dim" style={{ fontSize: 12, alignSelf: "center", marginLeft: 6 }}>
+            <span className="pill seafoam" style={{ marginRight: 6 }}>Ready</span>has runnable tests. The coach helps with every problem.
+          </span>
         </div>
       )}
 
@@ -87,9 +91,9 @@ export function Tracks() {
       {track.status === "ready" && groups.length > 0 && (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(360px, 100%), 1fr))", gap: 18, alignItems: "start" }}>
           {groups.map(([pattern, problems]) => (
-            <section key={pattern} className="card" aria-label={`${pattern}, ${problems.length} problems`}>
+            <section key={pattern} className="card" aria-label={`${patternName(pattern)}, ${problems.length} problems`}>
               <div style={{ display: "flex", alignItems: "baseline", gap: 10, marginBottom: 10 }}>
-                <h2 style={{ textTransform: "capitalize" }}>{pattern}</h2>
+                <h2>{patternName(pattern)}</h2>
                 <span className="mono dim" style={{ marginLeft: "auto", fontSize: 12 }}>{problems.length}</span>
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -104,9 +108,7 @@ export function Tracks() {
                     <span className={`pill ${DIFFICULTY_CLASS[problem.difficulty]}`} style={{ textTransform: "capitalize" }}>{problem.difficulty}</span>
                     {problem.runnable ? (
                       <span className="pill seafoam" title="Has a full statement and runnable tests">Ready</span>
-                    ) : (
-                      <span className="pill dim" title="The coach can help with it; tests are not written yet">Coach only</span>
-                    )}
+                    ) : null}
                   </button>
                 ))}
               </div>
