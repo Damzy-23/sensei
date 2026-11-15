@@ -125,13 +125,19 @@ def _client(kind: str) -> LLMClient:
     return _clients[kind]
 
 
-async def complete(task: Task, *, system: str, user: str, actor: Actor, name: str) -> str:
-    """Call the model for `task` and return its text. Traced as one `llm.call` span."""
+async def complete(
+    task: Task, *, system: str, user: str, actor: Actor, name: str, max_tokens: int | None = None
+) -> str:
+    """Call the model for `task` and return its text. Traced as one `llm.call` span.
+
+    `max_tokens` lowers the task's budget for a call whose answer is known to be small.
+    """
     kind, model = _route(task)
+    budget = min(max_tokens, MAX_TOKENS[task]) if max_tokens else MAX_TOKENS[task]
     with span(actor, "llm.call", name, user) as st:
         st.model = model
         result = await _client(kind).complete(
-            model=model, system=system, user=user, max_tokens=MAX_TOKENS[task], effort=EFFORT[task]
+            model=model, system=system, user=user, max_tokens=budget, effort=EFFORT[task]
         )
         st.model, st.tokens_in, st.tokens_out = result.model, result.tokens_in, result.tokens_out
         st.output = result.text
@@ -145,7 +151,11 @@ _FENCE = re.compile(r"^```(?:json)?\s*|\s*```$")
 
 async def complete_json(task: Task, *, system: str, user: str, actor: Actor, name: str) -> dict[str, Any]:
     """Like complete(), for a model asked to answer with one JSON object."""
-    text = await complete(task, system=system, user=user, actor=actor, name=name)
+    return parse_json(await complete(task, system=system, user=user, actor=actor, name=name), name)
+
+
+def parse_json(text: str, name: str) -> dict[str, Any]:
+    """Read the one JSON object a model was asked for. A code fence around it is allowed."""
     try:
         data = json.loads(_FENCE.sub("", text.strip()))
     except json.JSONDecodeError as exc:

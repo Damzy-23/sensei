@@ -1,7 +1,7 @@
 """Server-sent events framing shared by every streaming route.
 
 Each message is `event: <name>` + `data: <json>` + a blank line.
-Event names: `trace` (one per TraceEvent), `final` (FinalEvent), `error`, `end`.
+Event names: `trace` (one per TraceEvent), `final` (FinalEvent), `drawing` (Drawing), `error`, `end`.
 """
 
 from __future__ import annotations

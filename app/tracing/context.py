@@ -8,6 +8,7 @@ Usage:
             st.decision, st.reason, st.model, st.tokens_in, ...  # set inside the block
 
 A span emits one event when it finishes. turn() emits turn.start on entry and turn.end on exit.
+follow_up() re-enters a finished turn's trace for work that runs after the reply was sent.
 If a span runs with no active turn it goes into an "offline" trace.
 """
 
@@ -38,6 +39,7 @@ class TraceCtx:
     trace_id: str
     session_id: str
     seq: int = 0
+    root_span_id: str | None = None  # the turn's own span: what follow_up() hangs later work under
 
     def next_seq(self) -> int:
         self.seq += 1
@@ -119,6 +121,7 @@ def turn(session_id: str, name: str = "turn") -> Iterator[TraceCtx]:
         event_type="turn.end",
         name=name,
     )
+    tctx.root_span_id = root.span_id
     _emit(tctx, root, "turn.start", None)
     span_token = _current.set(root)
     start = time.perf_counter()
@@ -134,6 +137,30 @@ def turn(session_id: str, name: str = "turn") -> Iterator[TraceCtx]:
             _emit(tctx, root, "turn.end", _ms(start))
         finally:
             _trace.reset(trace_token)
+
+
+@contextmanager
+def follow_up(tctx: TraceCtx) -> Iterator[TraceCtx]:
+    """Re-enter a turn's trace after it has ended, for work that must not hold up the reply.
+
+    Spans opened inside join the same trace under the turn's span, numbered after turn.end,
+    so the inspector shows them with the turn they belong to. Emits no event of its own:
+    turn.end has already recorded when the reply was ready.
+    """
+    root = SpanState(
+        span_id=tctx.root_span_id or new_id("spn"),
+        parent_span_id=None,
+        actor="orchestrator",
+        event_type="turn.end",
+        name="turn",
+    )
+    trace_token = _trace.set(tctx)
+    span_token = _current.set(root)
+    try:
+        yield tctx
+    finally:
+        _current.reset(span_token)
+        _trace.reset(trace_token)
 
 
 @contextmanager
