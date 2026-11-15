@@ -10,6 +10,13 @@ interface AuthState { user: User | null; guest: boolean; signOut: () => void }
 const Ctx = createContext<AuthState>({ user: null, guest: false, signOut: () => undefined });
 export const useAuth = () => useContext(Ctx);
 
+/** The signed-in user's ID token for API calls, refreshed by Firebase when it is near expiry.
+ *  Null for a guest: the API decides whether a guest is allowed. */
+export async function idToken(): Promise<string | null> {
+  await auth.authStateReady();
+  return auth.currentUser ? auth.currentUser.getIdToken() : null;
+}
+
 /** Firebase error codes, in words a person can act on. */
 function explain(err: unknown): string {
   const code = (err as { code?: string }).code ?? "";

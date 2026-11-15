@@ -21,7 +21,10 @@ from dotenv import load_dotenv
 
 ROOT = Path(__file__).resolve().parent.parent
 API = "https://api.elevenlabs.io/v1/convai/agents"
-ALLOWED_HOSTS = ["senior-coach-1115-29b5.web.app", "senior-coach-1115-29b5.firebaseapp.com", "localhost:5173"]
+ALLOWED_HOSTS = [
+    "senior-coach-ai.web.app", "senior-coach-ai.firebaseapp.com",
+    "senior-40946072816.europe-west2.run.app", "localhost:5173", "localhost:8000",
+]
 FIRST_MESSAGE = "Hello. Before we begin, what should I call you?"
 
 
