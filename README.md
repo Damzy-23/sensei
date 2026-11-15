@@ -87,9 +87,7 @@ track problems (two have them).
 
 ## Live demo
 
-https://senior-coach-1115-29b5.web.app (Firebase Hosting). Sign in with Google or email,
-or continue as a guest.
+https://senior-coach-ai.web.app (Firebase Hosting; the API runs on Cloud Run). Sign in with
+Google or email, or try it as a guest. A walkthrough is in [docs/DEMO.md](docs/DEMO.md).
 
-During the hackathon the API behind it runs on a team laptop through a Cloudflare
-tunnel, so the demo answers only while that laptop is online. Sign-in is checked in the
-browser only: the API does not verify the Firebase token yet.
+Guests are allowed, so the API does not require a sign-in token.
