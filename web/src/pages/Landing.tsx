@@ -212,6 +212,12 @@ export function Landing({ onStart }: { onStart: () => void }) {
           </div>
         </div>
       </section>
+
+      <footer className="site-footer" style={{ ...sectionWrap, maxWidth: 1040 }}>
+        <span>Senior, built at the Imperial AI Hack, November 2026.</span>
+        <a href="/privacy">Privacy</a>
+        <a href="/tos">Terms</a>
+      </footer>
     </main>
   );
 }

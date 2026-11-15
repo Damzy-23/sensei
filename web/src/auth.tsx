@@ -83,6 +83,7 @@ function SignIn({ onGuest, onBack }: { onGuest: () => void; onBack: () => void }
           <button className="linklike" onClick={onGuest}>Try it as a guest</button>
           <span className="dim">Nothing is saved to an account.</span>
         </div>
+        <p className="signin-legal">By continuing you agree to the <a href="/tos">terms</a> and the <a href="/privacy">privacy policy</a>.</p>
       </section>
     </main>
   );
