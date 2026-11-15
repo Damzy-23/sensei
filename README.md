@@ -18,9 +18,9 @@ to trust when nobody can see why it said what it said or what it cost.
 ## What it does
 
 - **Learn mode.** A hint coach answers on a ladder from level 0 to 5. Each request
-  for help moves one step up. Hints are in words. Code is earned by trying: after three
-  tries on a problem the coach may give one line at a time, three lines at most, and can
-  write it into the editor when asked. Never in an interview.
+  for help moves one step up. Hints are in words. Code comes one line at a time: a student
+  who asks for a line gets one, and the coach offers one unasked only after three tries.
+  Three lines a problem at most, written into the editor on request. Never in an interview.
 - **Interview and blitz modes.** An interviewer probes the approach and its cost
   without teaching. Blitz adds a 10-minute countdown.
 - **A two-interviewer panel.** In interview modes a lead interviewer asks while an observer
@@ -88,7 +88,7 @@ it can read the page, the problem, the code and the conversation, run the code a
 and read their output, explain its last turn, search and open problems, switch mode and
 screen, point at lines, draw arrays, steps, notes and 3D pictures on the glass, play a short
 narrated explainer, and offer a practice session for the calendar. The only code it can
-write into the editor is a line the coach has offered once the student has earned it, and
+write into the editor is a line the coach has offered, one at a time, and
 the glass refuses anything that looks like code. Not yet tested with a
 real speaker.
 
