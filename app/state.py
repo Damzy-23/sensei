@@ -259,3 +259,16 @@ def resolve_ticket_row(ticket_id: str) -> dict[str, Any] | None:
 
 def add_mentor_message(session_id: str, text: str) -> ChatMessage:
     return add_message(session_id, "mentor", text)
+
+
+# ---------- eval runs ----------
+
+
+def record_eval_run(status: str, results_json: str) -> str:
+    run_id = _id("evr")
+    now = _now()
+    _execute(
+        "INSERT INTO eval_runs (id, started_at, finished_at, status, results_json) VALUES (?, ?, ?, ?, ?)",
+        (run_id, now, now, status, results_json),
+    )
+    return run_id

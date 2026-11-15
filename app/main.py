@@ -33,6 +33,7 @@ from app.models import (
     TicketDetail,
     TraceTree,
 )
+from app.eval import winrate
 from app.orchestrator.pipeline import handle_message, handle_run
 from app.tools import escalation as escalation_tools
 from app.tracing import store
@@ -231,4 +232,6 @@ async def resolve_ticket(ticket_id: str) -> Ticket:
 
 @app.get("/eval/results", response_model=EvalResults)
 async def eval_results() -> EvalResults:
-    return stubs.stub_eval_results()
+    """Real results once scripts/run_eval.py has written them; the stub until then."""
+    real = winrate.load_results(winrate.RESULTS_DIR / "results.json")
+    return real if real is not None else stubs.stub_eval_results()
