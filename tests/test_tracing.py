@@ -240,8 +240,8 @@ def test_duplicate_registration_is_rejected() -> None:
 def test_tool_call_outside_implementation_is_traced_as_error() -> None:
     with turn("ses_reg") as tctx:
         with pytest.raises(NotImplementedError):
-            orchestrator.read_state("ses_reg")
-    ev = next(e for e in _trace(tctx.trace_id) if e.name == "read_state")
+            orchestrator.select_mode({})
+    ev = next(e for e in _trace(tctx.trace_id) if e.name == "select_mode")
     assert ev.actor == "orchestrator"
     assert ev.status == "error"
 

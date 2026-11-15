@@ -16,14 +16,10 @@ from app.models import (
     EvalModelStats,
     EvalResults,
     FinalEvent,
-    Problem,
-    ProblemDetail,
     RunIn,
     RunOut,
-    SessionState,
     Ticket,
     TicketDetail,
-    VisibleTest,
 )
 from app.tracing.context import span, turn
 
@@ -34,52 +30,6 @@ def now_iso() -> str:
 
 def new_id(prefix: str) -> str:
     return f"{prefix}_{uuid.uuid4().hex[:12]}"
-
-
-_PROBLEMS: dict[str, ProblemDetail] = {
-    "two-sum": ProblemDetail(
-        id="two-sum",
-        title="Two Sum",
-        difficulty="easy",
-        pattern="hash map",
-        statement=(
-            "Given a list of integers `nums` and an integer `target`, return the indices "
-            "of the two numbers that add up to `target`. Each input has exactly one "
-            "solution and you may not use the same element twice. Return the indices in "
-            "any order."
-        ),
-        starter_code="def two_sum(nums: list[int], target: int) -> list[int]:\n    # your code here\n    pass\n",
-        visible_tests=[
-            VisibleTest(name="example 1", input="nums=[2,7,11,15], target=9", expected="[0, 1]"),
-            VisibleTest(name="example 2", input="nums=[3,2,4], target=6", expected="[1, 2]"),
-            VisibleTest(name="duplicates", input="nums=[3,3], target=6", expected="[0, 1]"),
-        ],
-    ),
-    "valid-parentheses": ProblemDetail(
-        id="valid-parentheses",
-        title="Valid Parentheses",
-        difficulty="easy",
-        pattern="stack",
-        statement=(
-            "Given a string `s` containing only the characters `()[]{}`, return `True` "
-            "if the brackets are valid: every open bracket is closed by the same type, in "
-            "the correct order."
-        ),
-        starter_code="def is_valid(s: str) -> bool:\n    # your code here\n    pass\n",
-        visible_tests=[
-            VisibleTest(name="simple pair", input='s="()"', expected="True"),
-            VisibleTest(name="mixed", input='s="()[]{}"', expected="True"),
-            VisibleTest(name="wrong order", input='s="(]"', expected="False"),
-        ],
-    ),
-}
-
-def list_problems() -> list[Problem]:
-    return [Problem(**p.model_dump(exclude={"statement", "starter_code", "visible_tests"})) for p in _PROBLEMS.values()]
-
-
-def get_problem(problem_id: str) -> ProblemDetail | None:
-    return _PROBLEMS.get(problem_id)
 
 
 def run_stub_turn(session_id: str, text: str) -> str:
@@ -125,21 +75,6 @@ def stub_run_out(run: RunIn) -> RunOut:
     if run.failed == 0 and run.total > 0:
         return RunOut(mode="interview", hint_level_available=0, next_action="review_complexity")
     return RunOut(mode="learn", hint_level_available=1, next_action="ask_for_hint")
-
-
-def stub_state(session_id: str) -> SessionState:
-    return SessionState(
-        session_id=session_id,
-        problem_id="two-sum",
-        mode="learn",
-        hint_level=1,
-        failed_runs=2,
-        hints_used=1,
-        time_on_problem=420,
-        mastery={"hash map": 0.42, "stack": 0.18},
-        escalated=False,
-        countdown_seconds=None,
-    )
 
 
 _TICKETS: dict[str, TicketDetail] = {

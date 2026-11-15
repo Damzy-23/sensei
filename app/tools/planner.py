@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from app import bank
 from app.tracing.registry import tool
 
 
@@ -22,7 +23,7 @@ def update_mastery(session_id: str, pattern: str, outcome: float, difficulty: st
 @tool("planner", "query_problem_bank", "tool.call")
 def query_problem_bank(pattern: str | None, difficulty: str | None) -> list[dict[str, Any]]:
     """Problems matching the filters, without hidden data."""
-    raise NotImplementedError("query_problem_bank: built in Phase 3")
+    return [p.model_dump() for p in bank.query(pattern=pattern, difficulty=difficulty)]  # type: ignore[arg-type]
 
 
 @tool("planner", "select_next_problem", "tool.call")

@@ -15,7 +15,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app import state, stubs
+from app import bank, state, stubs
 from app.models import (
     ChatMessage,
     EvalResults,
@@ -67,7 +67,7 @@ async def create_session() -> SessionCreated:
 @app.post("/sessions/{session_id}/message")
 async def post_message(session_id: str, body: MessageIn) -> StreamingResponse:
     _require_session(session_id)
-    if stubs.get_problem(body.problem_id) is None:
+    if bank.get_public(body.problem_id) is None:
         raise HTTPException(status_code=404, detail="problem not found")
 
     trace_id = stubs.run_stub_turn(session_id, body.text)
@@ -89,7 +89,7 @@ async def post_message(session_id: str, body: MessageIn) -> StreamingResponse:
 @app.post("/sessions/{session_id}/runs", response_model=RunOut)
 async def post_run(session_id: str, body: RunIn) -> RunOut:
     _require_session(session_id)
-    if stubs.get_problem(body.problem_id) is None:
+    if bank.get_public(body.problem_id) is None:
         raise HTTPException(status_code=404, detail="problem not found")
     with turn(session_id, name="runs"):
         await run_tests(session_id, body)
@@ -144,12 +144,12 @@ async def session_events(session_id: str, request: Request, follow: bool = True)
 
 @app.get("/problems", response_model=list[Problem])
 async def list_problems() -> list[Problem]:
-    return stubs.list_problems()
+    return bank.list_problems()
 
 
 @app.get("/problems/{problem_id}", response_model=ProblemDetail)
 async def get_problem(problem_id: str) -> ProblemDetail:
-    problem = stubs.get_problem(problem_id)
+    problem = bank.get_public(problem_id)
     if problem is None:
         raise HTTPException(status_code=404, detail="problem not found")
     return problem

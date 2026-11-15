@@ -4,13 +4,17 @@ from __future__ import annotations
 
 from typing import Any
 
+from app import bank
 from app.tracing.registry import tool
 
 
 @tool("interviewer", "get_problem", "tool.call")
 def get_problem(problem_id: str) -> dict[str, Any]:
     """Public problem view. Never includes the reference solution or hidden tests."""
-    raise NotImplementedError("get_problem: built in Phase 3")
+    view = bank.get_public(problem_id)
+    if view is None:
+        raise KeyError(f"unknown problem: {problem_id}")
+    return view.model_dump()
 
 
 @tool("interviewer", "llm_followup", "llm.call")
