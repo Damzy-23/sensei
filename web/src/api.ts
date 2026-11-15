@@ -44,9 +44,39 @@ export class ApiError extends Error {
   constructor(message: string, readonly status?: number, readonly traceId?: string) { super(message); }
 }
 
+// The sessions this browser has started, newest first. The API shows a visitor only the
+// data of sessions they hold, and a session id is the proof: it is unguessable, and it is
+// sent with every request. Kept in localStorage so every tab of this browser shares the list.
+const SESSIONS_KEY = "senior.sessions";
+const MAX_SESSIONS = 30;
+const SESSION_ID = /^ses_[0-9a-z_]{1,40}$/;
+let sessionsThisTab: string[] = []; // newest first; also the whole list when storage is unavailable
+
+/** Newest first, 30 at most. This tab's current session leads, so it is always sent; the list
+ *  every tab shares follows, and it is in the order the sessions were started. */
+function heldSessions(): string[] {
+  let stored: string[] = [];
+  try { stored = (localStorage.getItem(SESSIONS_KEY) ?? "").split(","); } catch { /* storage is blocked */ }
+  const all = [...sessionsThisTab.slice(0, 1), ...stored, ...sessionsThisTab].filter((id) => SESSION_ID.test(id));
+  return [...new Set(all)].slice(0, MAX_SESSIONS);
+}
+
+function rememberSession(sessionId: string): string {
+  sessionsThisTab = [sessionId, ...sessionsThisTab].slice(0, MAX_SESSIONS);
+  // Read again just before writing: another tab may have added a session since.
+  const next = heldSessions();
+  try { localStorage.setItem(SESSIONS_KEY, next.join(",")); } catch { /* private window: this tab still remembers */ }
+  return sessionId;
+}
+
+/** Who is calling: the sign-in token, if any, and the sessions this browser holds. */
 export async function authHeaders(): Promise<Record<string, string>> {
   const token = await idToken();
-  return token ? { authorization: `Bearer ${token}` } : {};
+  const sessions = heldSessions();
+  return {
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...(sessions.length ? { "x-senior-sessions": sessions.join(",") } : {}),
+  };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -59,7 +89,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 const post = <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 
-export const createSession = (mode: Mode) => post<{ session_id: string }>("/sessions", { mode }).then((r) => r.session_id);
+export const createSession = (mode: Mode) => post<{ session_id: string }>("/sessions", { mode }).then((r) => rememberSession(r.session_id));
 export const getState = (sessionId: string) => request<SessionState>(`/sessions/${sessionId}/state`);
 export const postRun = (sessionId: string, run: RunIn) => post<RunOut>(`/sessions/${sessionId}/runs`, run);
 export const listTracks = () => request<TrackSummary[]>("/tracks");
@@ -67,6 +97,8 @@ export const getTrack = (trackId: string) => request<Track>(`/tracks/${trackId}`
 export const getProblem = (problemId: string) => request<ProblemDetail>(`/problems/${problemId}`);
 export const getTrace = (traceId: string) => request<TraceTree>(`/traces/${traceId}`);
 export const listTickets = () => request<Ticket[]>("/mentor/tickets");
+/** Whether the queue holds every ticket (a mentor) or only those of the viewer's own sessions. */
+export const getQueueScope = () => request<{ scope: "all" | "own" }>("/mentor/scope").then((r) => r.scope);
 export const getMentorMessages = (sessionId: string) => request<ChatMessage[]>(`/sessions/${sessionId}/mentor-messages`);
 export const getTicket = (ticketId: string) => request<TicketDetail>(`/mentor/tickets/${ticketId}`);
 export const replyTicket = (ticketId: string, text: string) => post<ChatMessage>(`/mentor/tickets/${ticketId}/reply`, { text });
@@ -83,7 +115,11 @@ export const getPanel = (sessionId: string) => request<PanelView>(`/sessions/${s
 export const postDebrief = (sessionId: string) => post<Debrief>(`/sessions/${sessionId}/debrief`);
 export const startVoiceSession = () => post<{ signed_url: string; agent_id: string }>("/voice/session");
 export interface ActorSummary { actor: string; events: number; model_calls: number; tool_calls: number; blocked: number; errors: number; tokens_in: number; tokens_out: number; cost_usd: number }
-export interface ActivityLog { events: TraceEvent[]; summary: ActorSummary[]; durable: boolean }
+/** Counts over every session. Numbers only, so any visitor may see them. */
+export interface LogTotals { events: number; model_calls: number; tool_calls: number; cost_usd: number }
+/** `scope` says whose sessions `events` and `summary` cover: every session for a mentor, the
+ *  viewer's own otherwise. `totals_all` always covers every session; null if it could not be read. */
+export interface ActivityLog { events: TraceEvent[]; summary: ActorSummary[]; durable: boolean; scope: "all" | "own"; totals_all: LogTotals | null }
 export const getLogs = (filter: { actor?: string; type?: string }) =>
   request<ActivityLog>(`/logs?${new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][])}`);
 export const resolveTicket = (ticketId: string) => post<Ticket>(`/mentor/tickets/${ticketId}/resolve`);

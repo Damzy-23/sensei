@@ -13,7 +13,10 @@ const money = (n: number) => (n === 0 ? "$0" : n < 0.01 ? `$${n.toFixed(4)}` : `
 const human = (s: string) => s.replace(/_/g, " ");
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-/** Every agent action across all sessions: who did what, with which model or tool, and what it cost. */
+const ALL_SESSIONS = { fontSize: 12, marginTop: 6 } as const;
+
+/** The agents' actions: who did what, with which model or tool, and what it cost. A mentor is
+ *  shown every session. Anyone else is shown their own, with the whole system's totals beneath. */
 export function Logs() {
   const [actor, setActor] = useState("");
   const [type, setType] = useState("");
@@ -30,6 +33,9 @@ export function Logs() {
   const totals = useMemo(() => (log?.summary ?? []).reduce(
     (t, s) => ({ events: t.events + s.events, calls: t.calls + s.model_calls + s.tool_calls, cost: t.cost + s.cost_usd }),
     { events: 0, calls: 0, cost: 0 }), [log]);
+  // The tiles count what this viewer is shown. For a visitor that is their own sessions, so
+  // the whole system's totals go beneath; a mentor's tiles already cover every session.
+  const everyone = log?.scope === "own" ? log.totals_all : null;
 
   return (
     <main className="page">
@@ -48,10 +54,26 @@ export function Logs() {
 
       {log && (
         <>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {log.scope === "own" ? "Showing your own sessions. Mentors on the team see every session." : "Showing every session."}
+          </p>
+
           <div className="log-stats">
-            <div className="card"><div className="label">Actions</div><div className="stat">{totals.events.toLocaleString()}</div></div>
-            <div className="card"><div className="label">Model and tool calls</div><div className="stat">{totals.calls.toLocaleString()}</div></div>
-            <div className="card"><div className="label">Spend</div><div className="stat">{money(totals.cost)}</div></div>
+            <div className="card">
+              <div className="label">Actions</div>
+              <div className="stat">{totals.events.toLocaleString()}</div>
+              {everyone && <div className="mono dim" style={ALL_SESSIONS}>{everyone.events.toLocaleString()} across all sessions</div>}
+            </div>
+            <div className="card">
+              <div className="label">Model and tool calls</div>
+              <div className="stat">{totals.calls.toLocaleString()}</div>
+              {everyone && <div className="mono dim" style={ALL_SESSIONS}>{(everyone.model_calls + everyone.tool_calls).toLocaleString()} across all sessions</div>}
+            </div>
+            <div className="card">
+              <div className="label">Spend</div>
+              <div className="stat">{money(totals.cost)}</div>
+              {everyone && <div className="mono dim" style={ALL_SESSIONS}>{money(everyone.cost_usd)} across all sessions</div>}
+            </div>
           </div>
 
           <section className="card" aria-label="Agents">

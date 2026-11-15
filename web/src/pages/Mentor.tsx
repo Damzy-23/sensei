@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { getTicket, listTickets, replyTicket, resolveTicket, type Ticket, type TicketDetail } from "../api";
+import { getQueueScope, getTicket, listTickets, replyTicket, resolveTicket, type Ticket, type TicketDetail } from "../api";
 
 const REFRESH_MS = 5000;
 
@@ -24,6 +24,8 @@ export function Mentor() {
   const [reply, setReply] = useState("");
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  // "own" when the API shows this viewer only the tickets of their own sessions. Unknown stays silent.
+  const [scope, setScope] = useState<"all" | "own" | null>(null);
 
   const loadList = useCallback(async () => {
     try {
@@ -51,6 +53,12 @@ export function Mentor() {
     const timer = window.setInterval(() => void loadList(), REFRESH_MS);
     return () => window.clearInterval(timer);
   }, [loadList]);
+
+  useEffect(() => {
+    let current = true;
+    getQueueScope().then((next) => current && setScope(next), () => undefined);
+    return () => { current = false; };
+  }, []);
 
   useEffect(() => {
     setDetail(null);
@@ -103,6 +111,9 @@ export function Mentor() {
       <div>
         <div className="label">Human in the loop</div>
         <h1 style={{ marginTop: 4, fontSize: 34, lineHeight: "38px", letterSpacing: -1 }}>Mentor</h1>
+        {scope === "own" && (
+          <p className="muted" style={{ margin: "8px 0 0", fontSize: 13 }}>Tickets from your own sessions. Team mentors see the whole queue.</p>
+        )}
       </div>
 
       <div className="row-wrap">
