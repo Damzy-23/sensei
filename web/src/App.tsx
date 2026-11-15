@@ -1,6 +1,9 @@
 import { useApp, type PageId } from "./app-context";
-import { AUTH_ON, useAuth } from "./auth";
+import { Glass } from "./agent/Glass";
+import { VoiceAgent } from "./agent/VoiceAgent";
+import { useAuth } from "./auth";
 import { Blitz } from "./pages/Blitz";
+import { CvStudio } from "./pages/CvStudio";
 import { Inspector } from "./pages/Inspector";
 import { Mentor } from "./pages/Mentor";
 import { Tracks } from "./pages/Tracks";
@@ -10,11 +13,12 @@ const NAV: { id: PageId; label: string }[] = [
   { id: "workspace", label: "Workspace" },
   { id: "tracks", label: "Learn path" },
   { id: "blitz", label: "Blitz lab" },
+  { id: "cv", label: "CV studio" },
   { id: "inspector", label: "Agent inspector" },
   { id: "mentor", label: "Mentor" },
 ];
 
-export function Logo() {
+function Logo() {
   return (
     <span className="brand-mark">
       <svg width="24" height="28" viewBox="380 230 520 720" aria-hidden="true">
@@ -30,23 +34,9 @@ export function Logo() {
   );
 }
 
-function Account() {
-  const { user, signOut } = useAuth();
-  if (!AUTH_ON || !user) return null;
-  const name = user.displayName ?? user.email ?? "Signed in";
-  return (
-    <div className="account">
-      {user.photoURL
-        ? <img src={user.photoURL} alt="" width={28} height={28} referrerPolicy="no-referrer" />
-        : <span className="account-initial" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>}
-      <span className="account-name">{name}</span>
-      <button className="btn-ghost btn-small" onClick={() => signOut()}>Sign out</button>
-    </div>
-  );
-}
-
 export function App() {
   const { page, go, sessionError } = useApp();
+  const { user, signOut } = useAuth();
   return (
     <div className="app">
       <header className="topbar">
@@ -58,15 +48,21 @@ export function App() {
             </button>
           ))}
         </nav>
-        <Account />
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <VoiceAgent />
+          <span className="muted" style={{ fontSize: 12 }}>{user ? user.displayName ?? user.email : "Guest"}</span>
+          <button className="btn-ghost" style={{ height: 36 }} onClick={signOut}>{user ? "Sign out" : "Sign in"}</button>
+        </div>
       </header>
       {sessionError && <div className="bubble notice" role="alert" style={{ margin: "16px 28px 0" }}>{sessionError}</div>}
       {/* Workspace stays mounted so a conversation survives a visit to another screen. */}
       <div style={{ display: page === "workspace" ? "contents" : "none" }}><Workspace /></div>
       {page === "tracks" && <Tracks />}
       {page === "blitz" && <Blitz />}
+      {page === "cv" && <CvStudio />}
       {page === "inspector" && <Inspector />}
       {page === "mentor" && <Mentor />}
+      <Glass />
     </div>
   );
 }

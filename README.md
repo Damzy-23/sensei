@@ -29,6 +29,11 @@ to trust when nobody can see why it said what it said or what it cost.
 - **Agent inspector.** Each turn is a trace tree streamed live: agent, action, model,
   tokens, cost in USD, latency, and the decision with its reason.
 - **Tracks.** Blind 75 and NeetCode 150.
+- **Voice guide.** Talk to Senior: a voice agent that operates the page through typed tools
+  (open a problem, switch mode, run tests) and passes problem questions to the coach.
+- **Phone-style interview.** Call mode: an interviewer whose replies are written to be spoken.
+- **CV studio.** Paste a job description and your CV; get the CV rewritten for the role from
+  your own facts only, with the gaps listed, and save it as a PDF.
 
 ## How it works
 
@@ -56,16 +61,35 @@ Interactive API docs: http://localhost:8000/docs
 
 | | |
 |---|---|
-| Models | Claude Sonnet 5.5 (hint coach, interviewer) and Claude Haiku 5.5 (input guard), through the Anthropic API |
+| Models | Claude Sonnet 5.5 (hint coach, interviewer, caller, CV writer) and Claude Haiku 5.5 (input guard), through the Anthropic API. The voice guide runs on ElevenLabs Agents with its default model (`deepseek-v41-flash`) |
+| Services | ElevenLabs Agents (voice), Firebase Hosting and Authentication, Cloudflare Tunnel |
 | Libraries | FastAPI, Pydantic, Uvicorn, httpx, PyYAML, the Anthropic Python SDK, pytest |
 | Data | Problem lists: Blind 75 and NeetCode 150 (public lists; titles, difficulty and topic only) |
 
 ## Status
 
-Built and tested: the turn loop for learn, interview and blitz modes, both guards,
-escalation and the mentor queue, test-run handling with mastery, tracing with cost,
-and the track catalogue.
+Built and tested: the turn loop for learn, interview, blitz and call modes, both guards,
+escalation and the mentor queue, test-run handling with mastery, tracing with cost, the
+track catalogue, the CV studio, and the web app (workspace, learn path, blitz lab, CV studio,
+agent inspector, mentor queue, landing page, sign-in).
 
-Not built yet: the evaluator and planner agents, the tuned-versus-base hint model
-evaluation (`/eval/results` returns placeholder data), a frontend, and full
-statements and tests for most track problems (two have them).
+Built and tested by typed message to the live agent: the voice guide opens a problem and
+draws on the glass through its page tools. It has 18 tools: it can read the page, the
+problem, the code and the conversation, run the code and the tests and read their output,
+explain the coach's last turn, search and open problems, switch mode and screen, point at
+lines, and draw arrays, steps and notes on the glass. It cannot edit the student's code.
+Not yet tested with a real speaker, and the glass refuses anything that looks like code.
+
+Not built yet: phone calls (needs a phone number on the voice provider), the evaluator and
+planner agents, the tuned-versus-base hint model evaluation (`/eval/results` returns
+placeholder data), diagrams, generated video, and full statements and tests for most
+track problems (two have them).
+
+## Live demo
+
+https://senior-coach-1115-29b5.web.app (Firebase Hosting). Sign in with Google or email,
+or continue as a guest.
+
+During the hackathon the API behind it runs on a team laptop through a Cloudflare
+tunnel, so the demo answers only while that laptop is online. Sign-in is checked in the
+browser only: the API does not verify the Firebase token yet.

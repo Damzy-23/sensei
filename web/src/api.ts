@@ -66,6 +66,7 @@ export const getTrace = (traceId: string) => request<TraceTree>(`/traces/${trace
 export const listTickets = () => request<Ticket[]>("/mentor/tickets");
 export const getTicket = (ticketId: string) => request<TicketDetail>(`/mentor/tickets/${ticketId}`);
 export const replyTicket = (ticketId: string, text: string) => post<ChatMessage>(`/mentor/tickets/${ticketId}/reply`, { text });
+export const startVoiceSession = () => post<{ signed_url: string; agent_id: string }>("/voice/session");
 export const resolveTicket = (ticketId: string) => post<Ticket>(`/mentor/tickets/${ticketId}/resolve`);
 
 /** Send a student message. Trace events arrive through `onTrace` as the agents work;

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
-  ApiError, getProblem, getState, getTrack, postRun, sendMessage,
-  type Mode, type Problem, type ProblemDetail, type SessionState,
+  ApiError, getProblem, getState, getTrace, getTrack, postRun, sendMessage,
+  type Mode, type Problem, type ProblemDetail, type SessionState, type TraceNode,
 } from "../api";
 import { registerTool, type PageSnapshot } from "../agent/tools";
 import { MODE_COLOR, useApp } from "../app-context";
-import { entryPoint, runTests, type TestResult } from "../runner";
+import { entryPoint, runCode, runTests, type TestResult } from "../runner";
 import { CodeEditor, RichText } from "../components/CodeEditor";
 import { patternName } from "../labels";
 
@@ -64,6 +64,7 @@ export function Workspace() {
   const [running, setRunning] = useState(false);
   const [highlight, setHighlight] = useState<{ from: number; to: number; note: string } | null>(null);
   const nextId = useRef(0);
+  const lastTraceId = useRef<string | null>(null);
   const chatEnd = useRef<HTMLDivElement>(null);
 
   const say = useCallback((kind: Bubble["kind"], text: string, meta?: string) => {
@@ -108,6 +109,7 @@ export function Workspace() {
       });
       const who = final.mode === "learn" ? "Coach" : "Interviewer";
       say("coach", final.reply, final.mode === "learn" && final.hint_level > 0 ? `${who} · hint ${final.hint_level} of 5` : who);
+      lastTraceId.current = final.trace_id;
       await refresh();
       return { reply: final.reply, hint_level: final.hint_level, escalated: final.escalated };
     } catch (err) {
@@ -132,7 +134,7 @@ export function Workspace() {
       const summary = { passed: results.length - failures.length, failed: failures.length, total: results.length };
       await postRun(sessionId, { problem_id: problemId, code, ...summary, failures, runtime_ms: runtimeMs });
       await refresh();
-      return summary;
+      return { ...summary, tests: results };
     } catch (err) {
       setTestError(err instanceof Error ? err.message : String(err));
       throw err;
@@ -156,11 +158,43 @@ export function Workspace() {
       registerTool("open_problem", ({ problem_id }) => { openProblem(problem_id); return { problem_id }; }),
       registerTool("ask_coach", ({ text }) => ask(text)),
       registerTool("run_tests", () => run()),
+      registerTool("run_code", () => runCode(code)),
+      registerTool("read_code", () => {
+        const lines = code.split("\n");
+        return { lines: lines.length, code: lines.map((line, i) => `${i + 1}: ${line}`).join("\n") };
+      }),
+      registerTool("read_problem", () => {
+        if (loaded.status !== "ready") throw new Error("The problem has not loaded yet.");
+        return { ...loaded.problem, statement: loaded.detail?.statement ?? null, visible_tests: loaded.detail?.visible_tests ?? [] };
+      }),
+      registerTool("read_conversation", () => ({
+        messages: bubbles.slice(-8).map((b) => ({ from: b.kind === "notice" ? "system" : b.kind, text: b.text })),
+      })),
+      registerTool("explain_last_turn", async () => {
+        if (!lastTraceId.current) throw new Error("The coach has not answered yet in this session.");
+        const tree = await getTrace(lastTraceId.current);
+        const flat: TraceNode[] = [];
+        const walk = (node: TraceNode) => { flat.push(node); node.children.forEach(walk); };
+        tree.roots.forEach(walk);
+        const costs = flat.map((n) => n.event.cost_usd).filter((c): c is number => c !== null);
+        return {
+          total_ms: tree.roots[0]?.event.latency_ms ?? null,
+          cost_usd: costs.length ? Number(costs.reduce((a, b) => a + b, 0).toFixed(6)) : null,
+          steps: flat.slice(1).map(({ event: e }) => ({ actor: e.actor, step: e.name, decision: e.decision, reason: e.reason, model: e.model, ms: e.latency_ms })),
+        };
+      }),
+      registerTool("search_problems", async ({ query }) => {
+        const words = query.toLowerCase().split(/\s+/).filter(Boolean);
+        const seen = new Map<string, Problem>();
+        for (const trackId of TRACK_IDS) for (const p of (await getTrack(trackId)).problems) seen.set(p.id, p);
+        const matches = [...seen.values()].filter((p) => words.every((w) => `${p.title} ${p.pattern}`.toLowerCase().includes(w)));
+        return { matches: matches.slice(0, 8).map(({ id, title, difficulty, pattern }) => ({ id, title, difficulty, pattern })) };
+      }),
       registerTool("highlight_lines", (range) => { setHighlight(range); return { from: range.from, to: range.to }; }),
       registerTool("clear_highlight", () => { setHighlight(null); return {}; }),
     ];
     return () => cleanups.forEach((off) => off());
-  }, [page, mode, loaded, session, tests, go, setMode, openProblem, ask, run]);
+  }, [page, mode, loaded, session, tests, code, bubbles, go, setMode, openProblem, ask, run]);
 
   const submit = (event: FormEvent) => {
     event.preventDefault();

@@ -265,3 +265,16 @@ def test_call_mode_routes_to_the_phone_interviewer(client: TestClient) -> None:
     assert traces["select_agent"]["reason"].startswith("rule mode.call")
     assert "caller" in traces and "interviewer" not in traces and "hint_coach" not in traces
     assert "leak_check" in traces  # spoken replies pass the same output guard
+
+
+def test_the_inspector_can_replay_a_sessions_stored_events_in_order(client: TestClient) -> None:
+    from app.tracing import store
+
+    sid = _new(client)
+    first, second = _send(client, sid)[-1][1]["trace_id"], _send(client, sid)[-1][1]["trace_id"]
+    events = store.load_session_events(sid)
+    assert [e.type for e in events].count("turn.end") == 2
+    assert events[0].trace_id == first and events[-1].trace_id == second
+    assert [e.seq for e in events if e.trace_id == first] == sorted(e.seq for e in events if e.trace_id == first)
+    assert len(store.load_session_events(sid, limit=3)) == 3
+    assert store.load_session_events(sid, limit=3)[-1].event_id == events[-1].event_id

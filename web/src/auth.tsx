@@ -1,74 +1,84 @@
-// Google sign-in through Firebase. Turned off with VITE_AUTH=off (local dev without an account).
-import { initializeApp } from "firebase/app";
-import { GoogleAuthProvider, getAuth, onIdTokenChanged, signInWithPopup, signOut, type User } from "firebase/auth";
-import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  GoogleAuthProvider, createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword,
+  signInWithPopup, signOut, type User,
+} from "firebase/auth";
+import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { auth } from "./firebase";
+import { Landing } from "./pages/Landing";
 
-const env = import.meta.env;
-export const AUTH_ON = env.VITE_AUTH !== "off";
+interface AuthState { user: User | null; guest: boolean; signOut: () => void }
+const Ctx = createContext<AuthState>({ user: null, guest: false, signOut: () => undefined });
+export const useAuth = () => useContext(Ctx);
 
-// A Firebase web config is public by design; access is enforced by the API checking the token.
-const firebaseApp = initializeApp({
-  apiKey: env.VITE_FIREBASE_API_KEY ?? "AIzaSyCaKC_9ca_rHwSAEjR8V5vy81VyjEkiWhg",
-  authDomain: env.VITE_FIREBASE_AUTH_DOMAIN ?? "senior-coach-ai.web.app",
-  projectId: env.VITE_FIREBASE_PROJECT_ID ?? "glo-ai-3e547",
-  appId: env.VITE_FIREBASE_APP_ID ?? "1:40946072816:web:21757e595177b6db721635",
-});
-const auth = getAuth(firebaseApp);
-
-/** The current user's ID token, refreshed when near expiry. Null when signed out or auth is off. */
-export async function idToken(): Promise<string | null> {
-  if (!AUTH_ON) return null;
-  return auth.currentUser ? auth.currentUser.getIdToken() : null;
+/** Firebase error codes, in words a person can act on. */
+function explain(err: unknown): string {
+  const code = (err as { code?: string }).code ?? "";
+  if (code === "auth/operation-not-allowed" || code === "auth/configuration-not-found")
+    return "This sign-in method is not switched on for the project yet. Enable it in the Firebase console under Authentication.";
+  if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found")
+    return "That email and password do not match an account.";
+  if (code === "auth/email-already-in-use") return "An account with that email already exists. Sign in instead.";
+  if (code === "auth/weak-password") return "Use a password of at least 6 characters.";
+  if (code === "auth/popup-closed-by-user") return "The Google window was closed before sign-in finished.";
+  if (code === "auth/unauthorized-domain") return "This address is not on the project's list of authorised domains.";
+  return err instanceof Error ? err.message : String(err);
 }
 
-interface AuthState { user: User | null; ready: boolean; signIn: () => Promise<void>; signOut: () => Promise<void> }
-const Ctx = createContext<AuthState | null>(null);
-
-export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [ready, setReady] = useState(!AUTH_ON);
-  useEffect(() => {
-    if (!AUTH_ON) return;
-    return onIdTokenChanged(auth, (next) => { setUser(next); setReady(true); });
-  }, []);
-  const value: AuthState = {
-    user, ready,
-    signIn: async () => { await signInWithPopup(auth, new GoogleAuthProvider()); },
-    signOut: () => signOut(auth),
-  };
-  return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
-}
-
-export function useAuth(): AuthState {
-  const value = useContext(Ctx);
-  if (!value) throw new Error("useAuth must be used inside AuthProvider");
-  return value;
-}
-
-/** Renders its children only once someone is signed in (or auth is off). */
-export function SignInGate({ children, logo }: { children: ReactNode; logo: ReactNode }) {
-  const { user, ready, signIn } = useAuth();
+function SignIn({ onGuest }: { onGuest: () => void }) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  if (!AUTH_ON || user) return <>{children}</>;
-  if (!ready) return <main className="signin" aria-busy="true" />;
-  const start = async () => {
+
+  const attempt = async (action: () => Promise<unknown>) => {
     setBusy(true); setError(null);
-    try { await signIn(); }
-    catch (err) {
-      const code = (err as { code?: string }).code ?? "";
-      if (!code.includes("popup-closed") && !code.includes("cancelled-popup")) setError("Sign-in didn't work. Try again.");
-    } finally { setBusy(false); }
+    try { await action(); } catch (err) { setError(explain(err)); } finally { setBusy(false); }
   };
+  const submit = (event: FormEvent) => {
+    event.preventDefault();
+    void attempt(() => signInWithEmailAndPassword(auth, email, password));
+  };
+
   return (
-    <main className="signin">
-      <div className="signin-card">
-        {logo}
-        <h1>Senior</h1>
-        <p className="muted">Graded hints for coding interviews, never the answer. Sign in to keep your progress.</p>
-        <button className="btn-primary" onClick={start} disabled={busy}>{busy ? "Signing in…" : "Continue with Google"}</button>
-        {error && <p className="signin-error" role="alert">{error}</p>}
-      </div>
+    <main className="page" style={{ alignItems: "center", justifyContent: "center", minHeight: "100vh" }}>
+      <section className="card" aria-label="Sign in" style={{ width: "min(420px, 100%)", display: "flex", flexDirection: "column", gap: 16 }}>
+        <div>
+          <div className="label">Senior</div>
+          <h1 style={{ marginTop: 4 }}>Sign in</h1>
+          <p className="muted" style={{ margin: "8px 0 0" }}>A coach that gives hints, not answers, and shows its reasoning.</p>
+        </div>
+        <button className="btn-primary" disabled={busy} onClick={() => void attempt(() => signInWithPopup(auth, new GoogleAuthProvider()))}>
+          Continue with Google
+        </button>
+        <form onSubmit={submit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <label className="label" htmlFor="email">Email</label>
+          <input id="email" className="input" type="email" autoComplete="email" required value={email} onChange={(e) => setEmail(e.target.value)} />
+          <label className="label" htmlFor="password">Password</label>
+          <input id="password" className="input" type="password" autoComplete="current-password" required minLength={6} value={password} onChange={(e) => setPassword(e.target.value)} />
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            <button type="submit" className="btn-ghost" disabled={busy}>Sign in</button>
+            <button type="button" className="btn-ghost" disabled={busy || !email || password.length < 6}
+              onClick={() => void attempt(() => createUserWithEmailAndPassword(auth, email, password))}>
+              Create account
+            </button>
+          </div>
+        </form>
+        {error && <div className="bubble notice" role="alert">{error}</div>}
+        <button className="btn-ghost" onClick={onGuest}>Continue as a guest</button>
+        <span className="dim" style={{ fontSize: 12 }}>Guest sessions are not tied to an account.</span>
+      </section>
     </main>
   );
+}
+
+export function AuthGate({ children }: { children: ReactNode }) {
+  const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = still checking
+  const [guest, setGuest] = useState(false);
+  const [started, setStarted] = useState(false);
+  useEffect(() => onAuthStateChanged(auth, setUser), []);
+
+  if (user === undefined) return <main className="page"><span className="muted">Checking your sign-in…</span></main>;
+  if (!user && !guest) return started ? <SignIn onGuest={() => setGuest(true)} /> : <Landing onStart={() => setStarted(true)} />;
+  const leave = () => { setGuest(false); setStarted(true); void signOut(auth); };
+  return <Ctx.Provider value={{ user: user ?? null, guest, signOut: leave }}>{children}</Ctx.Provider>;
 }

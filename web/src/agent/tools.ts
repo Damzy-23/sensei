@@ -6,6 +6,7 @@
 
 import type { Mode } from "../api";
 import type { PageId } from "../app-context";
+import pageTools from "./page-tools.json";
 
 export interface PageSnapshot {
   page: PageId;
@@ -24,25 +25,28 @@ export interface ToolSignatures {
   set_mode: [{ mode: Mode }, { mode: Mode }];
   open_problem: [{ problem_id: string }, { problem_id: string }];
   ask_coach: [{ text: string }, { reply: string; hint_level: number; escalated: boolean }];
-  run_tests: [Record<string, never>, { passed: number; failed: number; total: number }];
+  run_tests: [Record<string, never>, { passed: number; failed: number; total: number; tests: { name: string; passed: boolean; message: string }[] }];
+  run_code: [Record<string, never>, { stdout: string; error: string | null; truncated: boolean }];
+  read_code: [Record<string, never>, { lines: number; code: string }];
+  read_problem: [Record<string, never>, { id: string; title: string; difficulty: string; pattern: string; statement: string | null; visible_tests: { name: string; input: string; expected: string }[] }];
+  read_conversation: [Record<string, never>, { messages: { from: string; text: string }[] }];
+  explain_last_turn: [Record<string, never>, { total_ms: number | null; cost_usd: number | null; steps: { actor: string; step: string; decision: string | null; reason: string | null; model: string | null; ms: number | null }[] }];
+  search_problems: [{ query: string }, { matches: { id: string; title: string; difficulty: string; pattern: string }[] }];
   highlight_lines: [{ from: number; to: number; note: string }, { from: number; to: number }];
   clear_highlight: [Record<string, never>, Record<string, never>];
+  glass_array: [{ values: string[]; pointers: string; caption: string }, { drawn: number }];
+  glass_steps: [{ title: string; steps: string[] }, { drawn: number }];
+  glass_note: [{ text: string }, { drawn: number }];
+  glass_clear: [Record<string, never>, Record<string, never>];
 }
 export type ToolName = keyof ToolSignatures;
 export type ToolHandler<N extends ToolName> = (args: ToolSignatures[N][0]) => Promise<ToolSignatures[N][1]> | ToolSignatures[N][1];
 export type ToolResult<N extends ToolName> = { ok: true; data: ToolSignatures[N][1] } | { ok: false; error: string };
 
-/** Descriptions are written for the model: what the tool does and when to use it. */
-export const TOOL_DESCRIPTIONS: Record<ToolName, string> = {
-  get_page_state: "Read what the student currently sees: screen, mode, problem, hint level and last test run. Call this before acting.",
-  navigate: "Switch screen: workspace, tracks, blitz, inspector or mentor.",
-  set_mode: "Start a new session in learn, interview or blitz mode.",
-  open_problem: "Open a problem in the workspace by its id.",
-  ask_coach: "Send the student's words to the coach or interviewer and return the reply. Use this for anything about the problem; never answer it yourself.",
-  run_tests: "Run the student's code against the visible tests and return the counts.",
-  highlight_lines: "Highlight a range of lines in the student's code with a short note.",
-  clear_highlight: "Remove the code highlight.",
-};
+/** Tool descriptions and parameters, written for the model. The same file defines the tools
+ *  on the voice agent (scripts/create_voice_agent.py), so the two cannot drift apart. */
+export const TOOL_SPECS = pageTools as Record<ToolName, { description: string; parameters: Record<string, unknown> }>;
+export const TOOL_NAMES = Object.keys(pageTools) as ToolName[];
 
 const handlers = new Map<ToolName, ToolHandler<ToolName>>();
 

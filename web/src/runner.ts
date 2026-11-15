@@ -82,3 +82,32 @@ export async function runTests(source: string, entry: string, tests: VisibleTest
   const raw = await py.runPythonAsync(HARNESS);
   return { results: JSON.parse(String(raw)) as TestResult[], runtimeMs: Math.round(performance.now() - started) };
 }
+
+const MAX_OUTPUT = 2000;
+
+// Runs the code as written and captures what it prints. The code is not changed or sent anywhere.
+const CAPTURE = `
+import io, json, traceback
+from contextlib import redirect_stdout
+
+def _capture(source):
+    out = io.StringIO()
+    error = None
+    try:
+        with redirect_stdout(out):
+            exec(source, {"__name__": "__main__"})
+    except Exception:
+        error = traceback.format_exc(limit=2).strip().splitlines()[-1]
+    return {"stdout": out.getvalue(), "error": error}
+
+json.dumps(_capture(_source))
+`;
+
+export interface CodeOutput { stdout: string; error: string | null; truncated: boolean }
+
+export async function runCode(source: string): Promise<CodeOutput> {
+  const py = await load();
+  py.globals.set("_source", source);
+  const { stdout, error } = JSON.parse(String(await py.runPythonAsync(CAPTURE))) as { stdout: string; error: string | null };
+  return { stdout: stdout.slice(0, MAX_OUTPUT), error, truncated: stdout.length > MAX_OUTPUT };
+}

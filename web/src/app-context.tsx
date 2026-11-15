@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { createSession, type Mode } from "./api";
 
-export type PageId = "workspace" | "tracks" | "blitz" | "inspector" | "mentor";
+export type PageId = "workspace" | "tracks" | "blitz" | "cv" | "inspector" | "mentor";
 
 interface AppState {
   page: PageId;
@@ -16,7 +16,7 @@ interface AppState {
 }
 
 const Ctx = createContext<AppState | null>(null);
-const PAGES: PageId[] = ["workspace", "tracks", "blitz", "inspector", "mentor"];
+const PAGES: PageId[] = ["workspace", "tracks", "blitz", "cv", "inspector", "mentor"];
 const pageFromHash = (): PageId => {
   const hash = window.location.hash.slice(1) as PageId;
   return PAGES.includes(hash) ? hash : "workspace";

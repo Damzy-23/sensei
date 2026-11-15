@@ -58,11 +58,12 @@ def load_trace(trace_id: str) -> list[TraceEvent]:
 
 
 def load_session_events(session_id: str, limit: int = 200) -> list[TraceEvent]:
+    """The most recent `limit` events of a session, oldest first."""
     rows = get_conn().execute(
-        "SELECT * FROM (SELECT * FROM events WHERE session_id = ? ORDER BY rowid DESC LIMIT ?) ORDER BY rowid",
+        "SELECT * FROM events WHERE session_id = ? ORDER BY rowid DESC LIMIT ?",
         (session_id, limit),
     ).fetchall()
-    return [TraceEvent(**dict(row)) for row in rows]
+    return [TraceEvent(**dict(row)) for row in reversed(rows)]
 
 
 def build_tree(events: list[TraceEvent]) -> list[TraceNode]:
