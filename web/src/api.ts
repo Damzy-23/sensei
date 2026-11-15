@@ -1,4 +1,5 @@
 // Typed client for the Senior API. Shapes mirror docs/API.md.
+import { idToken } from "./auth";
 
 // Same origin in a production build (FastAPI serves the app); the local API in dev.
 export const API_URL: string = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:8000" : "");
@@ -40,8 +41,13 @@ export class ApiError extends Error {
   constructor(message: string, readonly status?: number, readonly traceId?: string) { super(message); }
 }
 
+async function authHeaders(): Promise<Record<string, string>> {
+  const token = await idToken();
+  return token ? { authorization: `Bearer ${token}` } : {};
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers: { "content-type": "application/json", ...init?.headers } });
+  const response = await fetch(`${API_URL}${path}`, { ...init, headers: { "content-type": "application/json", ...(await authHeaders()), ...init?.headers } });
   if (!response.ok) {
     const detail = await response.json().then((b) => b.detail, () => response.statusText);
     throw new ApiError(typeof detail === "string" ? detail : JSON.stringify(detail), response.status);
@@ -70,7 +76,7 @@ export async function sendMessage(
   onTrace: (event: TraceEvent) => void,
 ): Promise<FinalEvent> {
   const response = await fetch(`${API_URL}/sessions/${sessionId}/message`, {
-    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body),
+    method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) }, body: JSON.stringify(body),
   });
   if (!response.ok || !response.body) {
     const detail = await response.json().then((b) => b.detail, () => response.statusText);
@@ -102,9 +108,16 @@ export async function sendMessage(
 
 /** Live trace stream for a session: stored events first, then new ones. Returns a function that closes it. */
 export function subscribeTraces(sessionId: string, onTrace: (event: TraceEvent) => void, onStatus?: (live: boolean) => void): () => void {
-  const source = new EventSource(`${API_URL}/sessions/${sessionId}/events`);
-  source.addEventListener("trace", (e) => onTrace(JSON.parse((e as MessageEvent).data) as TraceEvent));
-  source.onopen = () => onStatus?.(true);
-  source.onerror = () => onStatus?.(false);
-  return () => source.close();
+  // EventSource cannot send headers, so the sign-in token goes in the query string.
+  let source: EventSource | null = null;
+  let closed = false;
+  idToken().then((token) => {
+    if (closed) return;
+    const query = token ? `?token=${encodeURIComponent(token)}` : "";
+    source = new EventSource(`${API_URL}/sessions/${sessionId}/events${query}`);
+    source.addEventListener("trace", (e) => onTrace(JSON.parse((e as MessageEvent).data) as TraceEvent));
+    source.onopen = () => onStatus?.(true);
+    source.onerror = () => onStatus?.(false);
+  });
+  return () => { closed = true; source?.close(); };
 }

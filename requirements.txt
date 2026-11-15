@@ -6,3 +6,5 @@ python-dotenv
 pyyaml
 anthropic
 pytest
+google-auth
+requests

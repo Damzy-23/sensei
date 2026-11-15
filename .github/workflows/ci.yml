@@ -56,7 +56,7 @@ jobs:
       - name: Smoke test
         run: |
           docker run -d -p 8080:8080 --name senior senior
-          for i in $(seq 1 30); do curl -sf localhost:8080/healthz && break; sleep 1; done
+          for i in $(seq 1 30); do curl -sf localhost:8080/health && break; sleep 1; done
           curl -sf localhost:8080/ | grep -q '<title>Senior</title>'
           curl -sf localhost:8080/favicon.svg >/dev/null
           curl -sf localhost:8080/tracks | grep -q blind_75

@@ -1,0 +1,4 @@
+{
+  "projects": { "default": "glo-ai-3e547" },
+  "targets": { "glo-ai-3e547": { "hosting": { "senior": ["senior-coach"] } } }
+}

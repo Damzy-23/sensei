@@ -8,11 +8,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api import eval as eval_routes
+from app.api.auth import require_user
 from app.api import mentor, problems, sessions, traces, tracks
 
 app = FastAPI(title="Senior API", version="0.1.0")
@@ -26,11 +27,11 @@ app.add_middleware(
 )
 
 for module in (sessions, problems, tracks, traces, mentor, eval_routes):
-    app.include_router(module.router)
+    app.include_router(module.router, dependencies=[Depends(require_user)])
 
 
-@app.get("/healthz", include_in_schema=False)
-def healthz() -> dict[str, str]:
+@app.get("/health", include_in_schema=False)
+def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
