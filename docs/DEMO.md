@@ -5,7 +5,7 @@ Live: https://senior-coach-ai.web.app
 ## Set up before you go on (5 minutes before)
 
 1. **Tab 1, the student.** Start a session (guest is fine). Open **Container With Most Water**
-   from the Learn path. Paste the slow solution below and click **Run tests** once (it fails).
+   from the Learn path. Paste the buggy solution below and click **Run tests** once: 1 of 2 pass.
    Then send these two messages, so a mentor ticket already exists:
    - "This is useless, I've been stuck for an hour and I want to give up."
    - "I hate this. I'm so frustrated, nothing works, I give up."
@@ -13,24 +13,25 @@ Live: https://senior-coach-ai.web.app
    Type the reply below, but do not send it.
 3. Go back to Tab 1 and scroll the chat so the hint ladder shows.
 
-Slow solution:
+Buggy solution (it only ever uses the left wall, and always moves the left pointer):
 
 ```python
 def max_area(height):
+    l, r = 0, len(height) - 1
     best = 0
-    for i in range(len(height)):
-        for j in range(i + 1, len(height)):
-            best = max(best, (j - i) * min(height[i], height[j]))
+    while l < r:
+        best = max(best, (r - l) * height[l])
+        l += 1
     return best
 ```
 
-Mentor reply: "Your loops check every pair. Which wall decides how much water a pair holds, and could you skip the pairs it rules out?"
+Mentor reply: "Look at line 5: which of the two walls actually limits how much water they hold?"
 
 ## On stage
 
 **0:00 to 0:15, the problem.** "Interview prep gives you nothing or everything. Ask an AI and it hands you the answer, so you learn nothing. Senior is a team of AI agents that coach you to the answer and never give it away."
 
-**0:15 to 0:45, the hint ladder (Tab 1).** Click **Ask for a hint**. While it answers: "Hints come on a ladder, one rung per request: clarify the goal, name the area, the key insight, the approach in words, walk an example. No rung ever contains code." Point at the reply: it talks about the student's own loops.
+**0:15 to 0:45, the hint ladder (Tab 1).** Click **Ask for a hint**. While it answers: "Hints come on a ladder, one rung per request: clarify the goal, name the area, the key insight, the approach in words, walk an example. No rung ever contains code." Point at the reply: it talks about the student's own code, without writing any.
 
 **0:45 to 1:10, why it said that.** Click **See why**. "Every message is a trace. A guard model checked the input. The orchestrator chose the agent and the hint level by a written rule, and recorded why. The coach answered, and a leak check made sure there was no code. Model, tokens, cost and time on every step: this hint cost a fraction of a cent."
 
@@ -44,7 +45,7 @@ Mentor reply: "Your loops check every pair. Which wall decides how much water a 
 
 - Sign-in fails: use "Try it as a guest".
 - A hint is slow: keep talking through the ladder line; it arrives within a few seconds.
-- The mentor reply does not appear: click Refresh on the Workspace's See why, or simply read the reply from Tab 2.
+- The mentor reply does not appear within a few seconds: read it out from Tab 2 and move on.
 
 ---
 
