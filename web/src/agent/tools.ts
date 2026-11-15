@@ -38,6 +38,7 @@ export interface ToolSignatures {
   glass_steps: [{ title: string; steps: string[] }, { drawn: number }];
   glass_note: [{ text: string }, { drawn: number }];
   glass_clear: [Record<string, never>, Record<string, never>];
+  propose_calendar_event: [{ title: string; start: string; minutes: number; details: string }, { offered: true; start: string; end: string }];
 }
 export type ToolName = keyof ToolSignatures;
 export type ToolHandler<N extends ToolName> = (args: ToolSignatures[N][0]) => Promise<ToolSignatures[N][1]> | ToolSignatures[N][1];

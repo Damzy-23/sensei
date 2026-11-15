@@ -8,7 +8,8 @@ import { registerTool } from "./tools";
 type Item =
   | { id: number; kind: "array"; values: string[]; pointers: Map<number, string[]>; caption: string }
   | { id: number; kind: "steps"; title: string; steps: string[] }
-  | { id: number; kind: "note"; text: string };
+  | { id: number; kind: "note"; text: string }
+  | { id: number; kind: "event"; title: string; when: string; url: string };
 
 type WithoutId<T> = T extends unknown ? Omit<T, "id"> : never;
 type NewItem = WithoutId<Item>;
@@ -26,6 +27,15 @@ function parsePointers(text: string, length: number): Map<number, string[]> {
     if (label && Number.isInteger(i) && i >= 0 && i < length) out.set(i, [...(out.get(i) ?? []), label]);
   }
   return out;
+}
+
+const stamp = (d: Date) =>
+  `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}T${String(d.getHours()).padStart(2, "0")}${String(d.getMinutes()).padStart(2, "0")}00`;
+
+/** A prefilled Google Calendar link. The student adds the event themselves; nothing is written for them. */
+function calendarLink(title: string, start: Date, end: Date, details: string): string {
+  const query = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${stamp(start)}/${stamp(end)}`, details });
+  return `https://calendar.google.com/calendar/render?${query}`;
 }
 
 /** The glass is words and pictures. Code on it would bypass the coach's leak check. */
@@ -61,6 +71,16 @@ export function Glass() {
         return add({ kind: "note", text });
       }),
       registerTool("glass_clear", () => { setItems([]); return {}; }),
+      registerTool("propose_calendar_event", ({ title, start, minutes, details }) => {
+        const begins = new Date(start);
+        if (!title?.trim()) throw new Error("title is empty.");
+        if (Number.isNaN(begins.getTime())) throw new Error("start must look like 2026-11-16T18:30.");
+        if (!Number.isFinite(minutes) || minutes < 15 || minutes > 240) throw new Error("minutes must be between 15 and 240.");
+        const ends = new Date(begins.getTime() + minutes * 60_000);
+        const when = `${begins.toLocaleString([], { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}, ${minutes} min`;
+        add({ kind: "event", title, when, url: calendarLink(title, begins, ends, details ?? "") });
+        return { offered: true as const, start: begins.toISOString(), end: ends.toISOString() };
+      }),
     ];
     return () => cleanups.forEach((off) => off());
   }, []);
@@ -97,6 +117,16 @@ export function Glass() {
             </>
           )}
           {item.kind === "note" && <div style={{ fontSize: 13, lineHeight: "20px" }}>{item.text}</div>}
+          {item.kind === "event" && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ font: "700 15px var(--display)" }}>{item.title}</div>
+              <div className="muted" style={{ fontSize: 13 }}>{item.when}</div>
+              <a className="btn-primary" href={item.url} target="_blank" rel="noreferrer"
+                style={{ display: "inline-flex", alignItems: "center", alignSelf: "flex-start", textDecoration: "none", height: 36 }}>
+                Add to Google Calendar
+              </a>
+            </div>
+          )}
         </div>
       ))}
     </aside>
