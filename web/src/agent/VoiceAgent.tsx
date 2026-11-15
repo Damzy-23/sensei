@@ -36,7 +36,8 @@ function PhoneIcon({ hangUp = false }: { hangUp?: boolean }) {
 }
 
 function Control() {
-  const { startSession, endSession } = useConversationControls();
+  const { startSession, endSession, sendUserMessage } = useConversationControls();
+  const [typed, setTyped] = useState("");
   const { status } = useConversationStatus();
   const { isSpeaking } = useConversationMode();
   const [starting, setStarting] = useState(false);
@@ -85,6 +86,13 @@ function Control() {
           <span className="live-dot" style={{ background: "var(--baltic)" }} />
           {isSpeaking ? "Senior is speaking" : "Listening"}
         </span>
+      )}
+      {live && (
+        <form style={{ display: "flex", gap: 6 }} onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { sendUserMessage(typed.trim()); setTyped(""); } }}>
+          <label className="dim" style={{ fontSize: 12, alignSelf: "center" }} htmlFor="voice-text">Or type</label>
+          <input id="voice-text" className="input" style={{ width: 220, height: 36, padding: "0 10px" }} value={typed}
+            placeholder="Open two sum…" onChange={(e) => setTyped(e.target.value)} />
+        </form>
       )}
       {error && <span className="pill sky" role="alert" title={error}>Voice problem: {error.slice(0, 60)}</span>}
       {!live && (

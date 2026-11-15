@@ -5,34 +5,157 @@
   },
   "navigate": {
     "description": "Switch screen.",
-    "parameters": { "page": { "type": "string", "enum": ["workspace", "tracks", "blitz", "cv", "inspector", "mentor"], "description": "The screen to show." } }
+    "parameters": {
+      "page": {
+        "type": "string",
+        "enum": [
+          "workspace",
+          "tracks",
+          "blitz",
+          "cv",
+          "inspector",
+          "mentor"
+        ],
+        "description": "The screen to show."
+      }
+    }
   },
   "set_mode": {
     "description": "Start a new session in a mode: learn (hint coach), interview, blitz (timed interview) or call (phone-style interview).",
-    "parameters": { "mode": { "type": "string", "enum": ["learn", "interview", "blitz", "call"], "description": "The mode to start." } }
+    "parameters": {
+      "mode": {
+        "type": "string",
+        "enum": [
+          "learn",
+          "interview",
+          "blitz",
+          "call"
+        ],
+        "description": "The mode to start."
+      }
+    }
   },
   "open_problem": {
     "description": "Open a problem in the workspace by its id, for example two-sum or valid-parentheses.",
-    "parameters": { "problem_id": { "type": "string", "description": "The problem id, lower case with hyphens." } }
+    "parameters": {
+      "problem_id": {
+        "type": "string",
+        "description": "The problem id, lower case with hyphens."
+      }
+    }
   },
   "ask_coach": {
     "description": "Send the student's words to the coach or interviewer and return the reply. Use this for anything about the problem or their code. Never answer those yourself.",
-    "parameters": { "text": { "type": "string", "description": "What the student said, in their words." } }
+    "parameters": {
+      "text": {
+        "type": "string",
+        "description": "What the student said, in their words."
+      }
+    }
   },
   "run_tests": {
-    "description": "Run the student's code against the visible tests and return how many passed and failed.",
+    "description": "Run the student's code against the visible tests. Returns the counts and, for each test, its name, whether it passed, and the failure message.",
     "parameters": {}
   },
   "highlight_lines": {
     "description": "Point at a range of lines in the student's code with a short note.",
     "parameters": {
-      "from": { "type": "integer", "description": "First line, counting from 1." },
-      "to": { "type": "integer", "description": "Last line." },
-      "note": { "type": "string", "description": "One short sentence about those lines. No code." }
+      "from": {
+        "type": "integer",
+        "description": "First line, counting from 1."
+      },
+      "to": {
+        "type": "integer",
+        "description": "Last line."
+      },
+      "note": {
+        "type": "string",
+        "description": "One short sentence about those lines. No code."
+      }
     }
   },
   "clear_highlight": {
     "description": "Remove the code highlight.",
     "parameters": {}
+  },
+  "glass_array": {
+    "description": "Draw an array on the glass with labelled pointers under its cells. Use it to show the student's own example or the state they just described. Never use it to reveal the solution.",
+    "parameters": {
+      "values": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "description": "One cell's value."
+        },
+        "description": "The cells, left to right."
+      },
+      "pointers": {
+        "type": "string",
+        "description": "Pointer labels by cell index, like 0:left,4:right. Empty string for none."
+      },
+      "caption": {
+        "type": "string",
+        "description": "One short sentence shown under the drawing. No code."
+      }
+    }
+  },
+  "glass_steps": {
+    "description": "Show a short numbered list on the glass, for example a plan the student just stated or the stages of the interview. Words only.",
+    "parameters": {
+      "title": {
+        "type": "string",
+        "description": "A short heading."
+      },
+      "steps": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "description": "One step, in words."
+        },
+        "description": "Two to six steps."
+      }
+    }
+  },
+  "glass_note": {
+    "description": "Pin one short note on the glass, such as feedback on how the student is communicating.",
+    "parameters": {
+      "text": {
+        "type": "string",
+        "description": "One or two sentences. No code."
+      }
+    }
+  },
+  "glass_clear": {
+    "description": "Wipe the glass clean.",
+    "parameters": {}
+  },
+  "run_code": {
+    "description": "Run the student's code exactly as written and return what it printed (stdout) and any error. Use it to see what their code actually does before you talk about it. You cannot change their code.",
+    "parameters": {}
+  },
+  "read_code": {
+    "description": "Read the student's current code with line numbers, so you can refer to exact lines.",
+    "parameters": {}
+  },
+  "read_problem": {
+    "description": "Read the current problem: title, difficulty, pattern, statement and the visible tests.",
+    "parameters": {}
+  },
+  "read_conversation": {
+    "description": "Read the recent messages between the student and the coach on screen.",
+    "parameters": {}
+  },
+  "explain_last_turn": {
+    "description": "Explain why the coach answered the way it did on its last turn: each step, the rule or reason behind it, the model used, the time and the cost. Use it when the student asks why, or what something cost.",
+    "parameters": {}
+  },
+  "search_problems": {
+    "description": "Search the Blind 75 and NeetCode 150 problems by words in the title or by pattern (for example graphs, sliding window). Returns up to 8 matches with their ids.",
+    "parameters": {
+      "query": {
+        "type": "string",
+        "description": "Words from a title, or a pattern name."
+      }
+    }
   }
 }

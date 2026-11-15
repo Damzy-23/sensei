@@ -73,8 +73,12 @@ escalation and the mentor queue, test-run handling with mastery, tracing with co
 track catalogue, the CV studio, and the web app (workspace, learn path, blitz lab, CV studio,
 agent inspector, mentor queue, landing page, sign-in).
 
-Built, partly verified: the voice guide connects, speaks and listens. Its tool calls by
-voice have not been tested with a real speaker.
+Built and tested by typed message to the live agent: the voice guide opens a problem and
+draws on the glass through its page tools. It has 18 tools: it can read the page, the
+problem, the code and the conversation, run the code and the tests and read their output,
+explain the coach's last turn, search and open problems, switch mode and screen, point at
+lines, and draw arrays, steps and notes on the glass. It cannot edit the student's code.
+Not yet tested with a real speaker, and the glass refuses anything that looks like code.
 
 Not built yet: phone calls (needs a phone number on the voice provider), the evaluator and
 planner agents, the tuned-versus-base hint model evaluation (`/eval/results` returns

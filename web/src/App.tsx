@@ -1,4 +1,5 @@
 import { useApp, type PageId } from "./app-context";
+import { Glass } from "./agent/Glass";
 import { VoiceAgent } from "./agent/VoiceAgent";
 import { useAuth } from "./auth";
 import { Blitz } from "./pages/Blitz";
@@ -61,6 +62,7 @@ export function App() {
       {page === "cv" && <CvStudio />}
       {page === "inspector" && <Inspector />}
       {page === "mentor" && <Mentor />}
+      <Glass />
     </div>
   );
 }

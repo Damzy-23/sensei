@@ -32,7 +32,10 @@ test that stops it. Rows marked *not enforced yet* are rules we follow by review
 | Let the agent click or scrape the page | Typed page tools that change app state | `web/src/agent/tools.ts`: the registry is the only entry point |
 | Let the agent do what a screen did not offer | A screen registers the tools it serves | `invoke()` returns `not available on this screen` for anything else |
 | Let the voice agent answer the problem itself | It passes the student's words to the coach | `ask_coach` tool description; *not enforced yet* (needs the agent's own prompt and a test) |
-| Ship a provider key to the browser | The server issues a short-lived session URL | *Not built yet* |
+| Ship a provider key to the browser | The server issues a short-lived signed URL; the agent accepts nothing else | `app/api/voice.py`; agent `enable_auth` and origin allowlist in `scripts/create_voice_agent.py` |
+| Let the agent write the student's code | It can read and run the code, never change it | No tool edits code: see `web/src/agent/page-tools.json` |
+| Put the solution on the glass | The glass shows words and pictures and refuses code | `refuseCode` in `web/src/agent/Glass.tsx` |
+| Define the agent in a dashboard | Its role and tools are files in the repo | `scripts/create_voice_agent.py` builds it from `voice_guide.md` and `page-tools.json` |
 
 ## Operations
 
