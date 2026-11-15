@@ -21,6 +21,9 @@ to trust when nobody can see why it said what it said or what it cost.
   for help moves one step up. No level ever contains code.
 - **Interview and blitz modes.** An interviewer probes the approach and its cost
   without teaching. Blitz adds a 10-minute countdown.
+- **A two-interviewer panel.** In interview modes a lead interviewer asks while an observer
+  takes notes at the same moment. A live scorecard fills in across four dimensions, and
+  ending the interview gives scored feedback and what interviewers look for.
 - **Guardrails.** Every message is classified before an agent sees it. Every reply
   is checked for leaked code, and rewritten once if it fails.
 - **Human in the loop.** Still stuck after the level 5 hint, three blocked messages,
@@ -33,7 +36,10 @@ to trust when nobody can see why it said what it said or what it cost.
   (open a problem, switch mode, run tests) and passes problem questions to the coach.
 - **Phone-style interview.** Call mode: an interviewer whose replies are written to be spoken.
 - **CV studio.** Paste a job description and your CV; get the CV rewritten for the role from
-  your own facts only, with the gaps listed, and save it as a PDF.
+  your own facts only, with the gaps listed, and save it as a PDF. It also gives a job-fit
+  score, a score and reasons for every line, lines you can add yourself (drafts carry blanks
+  only you can fill), and web research on the role through Linkup and Exa. Scores are
+  computed by fixed rules in `app/cv/`, not written by a model.
 
 ## How it works
 

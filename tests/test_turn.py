@@ -278,3 +278,15 @@ def test_the_inspector_can_replay_a_sessions_stored_events_in_order(client: Test
     assert [e.seq for e in events if e.trace_id == first] == sorted(e.seq for e in events if e.trace_id == first)
     assert len(store.load_session_events(sid, limit=3)) == 3
     assert store.load_session_events(sid, limit=3)[-1].event_id == events[-1].event_id
+
+
+def test_not_understanding_gets_a_second_explanation_at_the_same_level(client: TestClient, model: ScriptedModel) -> None:
+    sid = _new(client)
+    assert _send(client, sid)[-1][1]["hint_level"] == 1
+    model.category = "confused"
+    events = _send(client, sid, text="I don't understand what you mean")
+    assert events[-1][1]["hint_level"] == 1  # explained again, not moved up the ladder
+    level = next(d for n, d in events if n == "trace" and d["name"] == "select_hint_level")
+    assert level["reason"].startswith("rule hint.reexplain")
+    assert "did not understand your last message" in model.calls[-1][1]
+    assert client.get(f"/sessions/{sid}/state").json()["hints_used"] == 1

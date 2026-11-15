@@ -25,7 +25,8 @@ class LeakDecision:
     reason: str
 
 
-def _decide(reply: str) -> LeakDecision:
+def decide(reply: str) -> LeakDecision:
+    """The rule itself, without a trace span. `check` wraps it for a reply to the student."""
     if "```" in reply:
         return LeakDecision(True, "leak.code_fence", "rule leak.code_fence: reply contains a code block")
     code_lines = [line for line in reply.splitlines() if _CODE_LINE.match(line)]
@@ -38,8 +39,22 @@ def _decide(reply: str) -> LeakDecision:
 
 def check(reply: str) -> LeakDecision:
     with span("guard", "guard.output", "leak_check", reply) as st:
-        decision = _decide(reply)
+        decision = decide(reply)
         st.decision = "blocked" if decision.leaked else "pass"
         st.reason = decision.reason
         st.status = "blocked" if decision.leaked else "ok"
         return decision
+
+
+def keep_safe_notes(signals: list[dict]) -> list[dict]:
+    """Drop any panel note that contains code: the candidate reads these mid-interview."""
+    with span("guard", "guard.output", "panel_note_check", f"{len(signals)} notes") as st:
+        safe = [s for s in signals if not decide(s["note"]).leaked]
+        dropped = len(signals) - len(safe)
+        st.decision = "blocked" if dropped else "pass"
+        st.reason = (
+            f"rule panel.code_in_note: dropped {dropped} of {len(signals)} notes"
+            if dropped else "rule panel.clean: no code in the notes"
+        )
+        st.status = "blocked" if dropped else "ok"
+        return safe

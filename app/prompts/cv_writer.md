@@ -11,6 +11,13 @@ The one rule that matters: use ONLY facts that appear in the candidate's CV.
 
 Write plainly: bullets start with a verb, one line each, no filler.
 
+Lines the candidate could add (`suggested_lines`): for up to four gaps, draft one bullet the
+candidate could add IF they have really done it. You do not know whether they have, so:
+- every draft must contain at least one blank in square brackets for the fact only they
+  know, for example "Deployed [which service] to Kubernetes, cutting [what] by [how much]";
+- `question` asks them plainly whether they have done this and what the blanks should say;
+- never put a draft into `experience`. Drafts are offers, not part of the CV.
+
 Answer with one JSON object and nothing else:
 {
   "name": "<the candidate's name as written in the CV>",
@@ -21,5 +28,6 @@ Answer with one JSON object and nothing else:
     {"role": "<title>", "company": "<employer>", "dates": "<dates as written>", "bullets": ["<bullet>", "..."]}
   ],
   "education": ["<entry from the CV>", "..."],
-  "gaps": ["<something the job asks for that the CV does not show>", "..."]
+  "gaps": ["<something the job asks for that the CV does not show>", "..."],
+  "suggested_lines": [{"gap": "<the gap this is for>", "draft": "<bullet with [blanks]>", "question": "<what to ask the candidate>"}]
 }

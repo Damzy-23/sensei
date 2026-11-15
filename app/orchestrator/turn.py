@@ -6,8 +6,10 @@ input guard -> agent selection -> hint ladder -> one specialist -> output guard
 
 from __future__ import annotations
 
+import asyncio
+
 from app import catalog
-from app.agents import caller, hint_coach, interviewer
+from app.agents import caller, hint_coach, interviewer, observer
 from app.agents.context import AgentContext
 from app.guards import input as input_guard
 from app.guards import leak, policy
@@ -21,6 +23,7 @@ from app.tracing.context import span, turn
 
 AGENTS = {"hint_coach": hint_coach.respond, "interviewer": interviewer.respond, "caller": caller.respond}
 HISTORY_TURNS = 8
+PANEL_AGENTS = frozenset({"interviewer", "caller"})  # modes where the observer sits in
 
 
 class TurnError(RuntimeError):
@@ -63,6 +66,15 @@ async def _draft_reply(agent: str, ctx: AgentContext) -> str:
     return policy.LEAK_FALLBACK_REPLY if leak.check(reply).leaked else reply
 
 
+async def _observe(ctx: AgentContext) -> list[dict]:
+    """The observer's notes for this exchange. Its failure never costs the candidate their reply:
+    the error is on the trace, and the turn carries on with no notes."""
+    try:
+        return await observer.observe(ctx)
+    except LLMError:
+        return []
+
+
 async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
     session = memory.get_session(session_id)
     problem = catalog.find_problem(body.problem_id)
@@ -91,14 +103,25 @@ async def run_turn(session_id: str, body: MessageIn) -> FinalEvent:
                     if int(level.value) > session.hint_level or level.rule == "hint.max":
                         session.hints_used += 1
                     session.hint_level = int(level.value)
-                history = [(m.actor, m.text) for m in memory.transcript(session_id, HISTORY_TURNS)][:-1]
+                # The transcript stores every agent reply as "coach"; in an interview that speaker is the interviewer.
+                speaker = "interviewer" if agent.value in PANEL_AGENTS else "coach"
+                history = [
+                    (speaker if m.actor == "coach" else m.actor, m.text)
+                    for m in memory.transcript(session_id, HISTORY_TURNS)
+                ][:-1]
                 ctx = AgentContext(
                     problem_title=problem.title, pattern=problem.pattern, difficulty=problem.difficulty,
                     statement=catalog.statement(problem.id), student_message=body.text, student_code=body.code,
                     history=history, hint_level=session.hint_level, failed_runs=session.failed_runs,
-                    countdown_seconds=countdown(session),
+                    countdown_seconds=countdown(session), reexplain=verdict.category == "confused",
                 )
-                reply = await _draft_reply(agent.value, ctx)
+                if agent.value in PANEL_AGENTS:
+                    # The lead answers while the observer takes notes: side by side, so the panel adds no wait.
+                    reply, signals = await asyncio.gather(_draft_reply(agent.value, ctx), _observe(ctx))
+                    if signals:
+                        session.panel_notes.extend(leak.keep_safe_notes(signals))
+                else:
+                    reply = await _draft_reply(agent.value, ctx)
 
             escalation = rules.should_escalate(session, verdict.category)
             if escalation is not None:

@@ -9,7 +9,7 @@ from app.llm import gateway
 from app.prompts.loader import load
 from app.tracing.context import span
 
-CATEGORIES = frozenset({"ok", "stuck", "solution_request", "frustrated", "off_topic", "injection"})
+CATEGORIES = frozenset({"ok", "stuck", "confused", "solution_request", "frustrated", "off_topic", "injection"})
 
 
 @dataclass(frozen=True)
