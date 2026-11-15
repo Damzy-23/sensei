@@ -288,3 +288,6 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .empty-steps b { color: var(--text); font-weight: 600; }
 .step-no { flex: none; width: 28px; height: 28px; border-radius: 999px; display: grid; place-items: center; font: 500 12px var(--mono); color: var(--sky); border: 1px dashed var(--sky); }
 .thinking-card { display: flex; align-items: center; gap: 12px; color: var(--text-2); }
+
+/* Live feed of the voice agent's tool calls. */
+.agent-activity { position: fixed; left: 24px; bottom: 24px; z-index: 20; width: min(360px, calc(100vw - 32px)); max-height: 50vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 16px; background: rgba(21, 35, 45, 0.82); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(107, 159, 224, 0.4); animation: fade 0.35s var(--ease) both; }

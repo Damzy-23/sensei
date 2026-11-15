@@ -51,6 +51,17 @@ export const TOOL_NAMES = Object.keys(pageTools) as ToolName[];
 
 const handlers = new Map<ToolName, ToolHandler<ToolName>>();
 
+/** One finished tool call, for the on-screen activity feed. Arguments are shown as the agent sent them. */
+export interface ToolCall { id: number; name: ToolName; args: unknown; ok: boolean; error: string | null; ms: number; at: number }
+const listeners = new Set<(call: ToolCall) => void>();
+let callCount = 0;
+
+/** Watch every tool call the agent makes. Returns a function that stops watching. */
+export function onToolCall(listener: (call: ToolCall) => void): () => void {
+  listeners.add(listener);
+  return () => { listeners.delete(listener); };
+}
+
 /** Register a handler. Returns a function that removes it, for use as an effect cleanup. */
 export function registerTool<N extends ToolName>(name: N, handler: ToolHandler<N>): () => void {
   handlers.set(name, handler as unknown as ToolHandler<ToolName>);
@@ -59,6 +70,17 @@ export function registerTool<N extends ToolName>(name: N, handler: ToolHandler<N
 
 /** Call a tool. Never throws: a failure comes back as `{ ok: false, error }` for the agent to read. */
 export async function invoke<N extends ToolName>(name: N, args: ToolSignatures[N][0]): Promise<ToolResult<N>> {
+  const started = performance.now();
+  const result = await run(name, args);
+  const call: ToolCall = {
+    id: callCount++, name, args, ok: result.ok, error: result.ok ? null : result.error,
+    ms: Math.round(performance.now() - started), at: Date.now(),
+  };
+  listeners.forEach((listener) => listener(call));
+  return result;
+}
+
+async function run<N extends ToolName>(name: N, args: ToolSignatures[N][0]): Promise<ToolResult<N>> {
   const handler = handlers.get(name) as ToolHandler<N> | undefined;
   if (!handler) return { ok: false, error: `Tool ${name} is not available on this screen.` };
   try {
