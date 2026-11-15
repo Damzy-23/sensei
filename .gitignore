@@ -6,3 +6,6 @@ __pycache__/
 data/sensei.db
 data/sensei.db-wal
 data/sensei.db-shm
+
+# Local agent worktrees and settings
+.claude/
