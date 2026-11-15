@@ -1,4 +1,5 @@
 import { useApp, type PageId } from "./app-context";
+import { useAuth } from "./auth";
 import { Blitz } from "./pages/Blitz";
 import { Inspector } from "./pages/Inspector";
 import { Mentor } from "./pages/Mentor";
@@ -31,6 +32,7 @@ function Logo() {
 
 export function App() {
   const { page, go, sessionError } = useApp();
+  const { user, signOut } = useAuth();
   return (
     <div className="app">
       <header className="topbar">
@@ -42,6 +44,10 @@ export function App() {
             </button>
           ))}
         </nav>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <span className="muted" style={{ fontSize: 12 }}>{user ? user.displayName ?? user.email : "Guest"}</span>
+          <button className="btn-ghost" style={{ height: 36 }} onClick={signOut}>{user ? "Sign out" : "Sign in"}</button>
+        </div>
       </header>
       {sessionError && <div className="bubble notice" role="alert" style={{ margin: "16px 28px 0" }}>{sessionError}</div>}
       {/* Workspace stays mounted so a conversation survives a visit to another screen. */}

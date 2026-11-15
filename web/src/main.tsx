@@ -2,12 +2,15 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./App";
 import { AppProvider } from "./app-context";
+import { AuthGate } from "./auth";
 import "./theme.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AppProvider>
-      <App />
-    </AppProvider>
+    <AuthGate>
+      <AppProvider>
+        <App />
+      </AppProvider>
+    </AuthGate>
   </StrictMode>,
 );

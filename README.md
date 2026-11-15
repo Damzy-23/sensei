@@ -69,3 +69,12 @@ and the track catalogue.
 Not built yet: the evaluator and planner agents, the tuned-versus-base hint model
 evaluation (`/eval/results` returns placeholder data), a frontend, and full
 statements and tests for most track problems (two have them).
+
+## Live demo
+
+https://senior-coach-1115-29b5.web.app (Firebase Hosting). Sign in with Google or email,
+or continue as a guest.
+
+During the hackathon the API behind it runs on a team laptop through a Cloudflare
+tunnel, so the demo answers only while that laptop is online. Sign-in is checked in the
+browser only: the API does not verify the Firebase token yet.
