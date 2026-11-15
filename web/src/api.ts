@@ -76,6 +76,19 @@ export const getLogs = (filter: { actor?: string; type?: string }) =>
   request<ActivityLog>(`/logs?${new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][])}`);
 export const resolveTicket = (ticketId: string) => post<Ticket>(`/mentor/tickets/${ticketId}/resolve`);
 
+// Profile: the career agent's interview and its Linkup-backed role recommendations.
+export interface ProfileTurn { profile_id: string; step: number; total: number; question: string | null; done: boolean; trace_id: string | null }
+export interface Source { title: string; url: string }
+export interface RoleRecommendation { title: string; fit: string; skills_to_strengthen: string[]; sources: Source[] }
+export interface PracticePlan { track_id: string; track_title: string; patterns: string[]; why: string }
+export interface ProfileResult { profile_id: string; summary: string; roles: RoleRecommendation[]; practice: PracticePlan; sources: Source[]; trace_id: string | null }
+const sessionQuery = (sessionId: string | null) => (sessionId ? `?session_id=${encodeURIComponent(sessionId)}` : "");
+export const startProfile = (sessionId: string | null) => post<ProfileTurn>("/profile", { session_id: sessionId });
+export const answerProfile = (profileId: string, text: string, sessionId: string | null) =>
+  post<ProfileTurn>(`/profile/${profileId}/answer${sessionQuery(sessionId)}`, { text });
+export const recommendRoles = (profileId: string, sessionId: string | null) =>
+  post<ProfileResult>(`/profile/${profileId}/recommend${sessionQuery(sessionId)}`);
+
 /** Send a student message. Trace events arrive through `onTrace` as the agents work;
  *  the promise resolves with the final reply, or rejects with the named error. */
 export async function sendMessage(

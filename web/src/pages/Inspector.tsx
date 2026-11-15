@@ -23,6 +23,7 @@ const ACTOR_COLOR: Record<string, string> = {
   planner: "var(--seafoam)",
   mentor: "var(--baltic)",
   escalation: "var(--baltic)",
+  career_agent: "var(--seafoam)",
 };
 const actorColor = (actor: string): string => ACTOR_COLOR[actor] ?? "var(--text-2)";
 

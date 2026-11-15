@@ -7,6 +7,7 @@ import { CvStudio } from "./pages/CvStudio";
 import { Inspector } from "./pages/Inspector";
 import { Logs } from "./pages/Logs";
 import { Mentor } from "./pages/Mentor";
+import { Profile } from "./pages/Profile";
 import { Tracks } from "./pages/Tracks";
 import { Workspace } from "./pages/Workspace";
 
@@ -14,6 +15,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: "workspace", label: "Workspace" },
   { id: "tracks", label: "Learn path" },
   { id: "blitz", label: "Blitz lab" },
+  { id: "profile", label: "Profile" },
   { id: "cv", label: "CV studio" },
   { id: "inspector", label: "Agent inspector" },
   { id: "mentor", label: "Mentor" },
@@ -62,6 +64,8 @@ export function App() {
       {page === "tracks" && <Tracks />}
       {page === "blitz" && <Blitz />}
       {page === "cv" && <CvStudio />}
+      {/* Profile stays mounted too, so an interview in progress is not lost. */}
+      <div style={{ display: page === "profile" ? "contents" : "none" }}><Profile /></div>
       {page === "inspector" && <Inspector />}
       {page === "mentor" && <Mentor />}
       {page === "logs" && <Logs />}
