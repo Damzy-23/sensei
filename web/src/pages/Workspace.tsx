@@ -7,6 +7,7 @@ import { registerTool, type PageSnapshot } from "../agent/tools";
 import { MODE_COLOR, useApp } from "../app-context";
 import { entryPoint, runCode, runTests, type TestResult } from "../runner";
 import { CodeEditor, RichText } from "../components/CodeEditor";
+import { InterviewPanel } from "../components/InterviewPanel";
 import { patternName } from "../labels";
 
 type Bubble = { id: number; kind: "student" | "coach" | "mentor" | "notice"; text: string; meta?: string };
@@ -313,6 +314,8 @@ export function Workspace() {
             <span className="pill" style={{ color: MODE_COLOR[mode] }}>{MODES.find((m) => m.id === mode)!.label}</span>
             <button className="btn-ghost" style={{ marginLeft: "auto", height: 36 }} onClick={() => go("inspector")}>See why</button>
           </div>
+
+          {mode !== "learn" && <InterviewPanel sessionId={sessionId} turns={bubbles.length} busy={!!busy} />}
 
           {mode === "learn" && (
             <ol className="ladder" aria-label={`Hint ladder: ${hintLevel === 0 ? "no hints used" : `hint ${hintLevel} of 5`}`}>

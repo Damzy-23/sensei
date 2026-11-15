@@ -16,7 +16,10 @@ from app import catalog, stubs
 from app.api.sse import sse
 from app.config import get_settings
 from app.memory import repository as memory
-from app.models import ChatMessage, FinalEvent, MessageIn, RunIn, RunOut, SessionCreated, SessionCreateIn, SessionState
+from app.models import (
+    ChatMessage, Debrief, FinalEvent, MessageIn, PanelView, RunIn, RunOut, SessionCreated, SessionCreateIn, SessionState,
+)
+from app.orchestrator import panel
 from app.orchestrator import turn as orchestrator
 from app.tracing import store
 
@@ -131,3 +134,26 @@ async def session_events(session_id: str, request: Request) -> StreamingResponse
             store.unsubscribe(session_id, queue)
 
     return StreamingResponse(stub_stream() if _stubbed() else live_stream(), media_type="text/event-stream")
+
+
+@router.get("/{session_id}/panel", response_model=PanelView)
+async def get_panel(session_id: str) -> PanelView:
+    """The interview panel's notes so far, and the score each dimension has earned."""
+    _require_session(session_id)
+    if _stubbed():
+        return PanelView(active=False, notes=[], scores=panel.scores([]))
+    return panel.view(memory.get_session(session_id))  # type: ignore[arg-type]
+
+
+@router.post("/{session_id}/debrief", response_model=Debrief)
+async def post_debrief(session_id: str) -> Debrief:
+    """End the interview: scored feedback written from the observer's notes."""
+    _require_session(session_id)
+    if _stubbed():
+        raise HTTPException(status_code=409, detail="Feedback needs the real agents: set SENSEI_USE_STUBS=0.")
+    try:
+        return await panel.run_debrief(session_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except orchestrator.TurnError as exc:
+        raise HTTPException(status_code=502, detail={"message": str(exc), "trace_id": exc.trace_id}) from exc

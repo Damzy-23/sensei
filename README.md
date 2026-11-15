@@ -21,6 +21,9 @@ to trust when nobody can see why it said what it said or what it cost.
   for help moves one step up. No level ever contains code.
 - **Interview and blitz modes.** An interviewer probes the approach and its cost
   without teaching. Blitz adds a 10-minute countdown.
+- **A two-interviewer panel.** In interview modes a lead interviewer asks while an observer
+  takes notes at the same moment. A live scorecard fills in across four dimensions, and
+  ending the interview gives scored feedback and what interviewers look for.
 - **Guardrails.** Every message is classified before an agent sees it. Every reply
   is checked for leaked code, and rewritten once if it fails.
 - **Human in the loop.** Still stuck after the level 5 hint, three blocked messages,

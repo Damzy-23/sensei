@@ -18,6 +18,7 @@ Actor = Literal[
     "orchestrator",
     "interviewer",
     "caller",
+    "observer",
     "cv_writer",
     "hint_coach",
     "evaluator",
@@ -88,6 +89,33 @@ class Track(TrackSummary):
 
 class SessionCreateIn(BaseModel):
     mode: Mode = "learn"
+
+
+class PanelNote(BaseModel):
+    dimension: Literal["communication", "approach", "correctness", "complexity"]
+    rating: Literal[-1, 0, 1]
+    note: str
+
+
+class DimensionScore(BaseModel):
+    score: Optional[float] = Field(description="1.0 to 4.0, or null when the dimension was not observed.")
+    signals: int = Field(ge=0, description="How many notes the score is based on.")
+
+
+class PanelView(BaseModel):
+    active: bool = Field(description="True in interview, blitz and call modes, where the panel sits.")
+    notes: list[PanelNote]
+    scores: dict[str, DimensionScore]
+
+
+class Debrief(BaseModel):
+    summary: str
+    strengths: list[str]
+    work_on: list[str]
+    interviewers_look_for: list[str]
+    scores: dict[str, DimensionScore]
+    notes_used: int
+    trace_id: str
 
 
 class SessionCreated(BaseModel):

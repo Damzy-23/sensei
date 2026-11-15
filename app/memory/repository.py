@@ -65,6 +65,7 @@ class Session:
     escalated: bool = False
     latest_code: str = ""
     mastery: dict[str, float] = field(default_factory=dict)
+    panel_notes: list[dict] = field(default_factory=list)  # the observer's signals for the current problem
 
     def time_on_problem(self) -> int:
         if self.problem_started_at is None:
@@ -77,6 +78,7 @@ class Session:
             return
         self.problem_id, self.problem_started_at = problem_id, now_iso()
         self.hint_level = self.failed_runs = self.hints_used = 0
+        self.panel_notes = []
 
 
 # ---------- sessions ----------

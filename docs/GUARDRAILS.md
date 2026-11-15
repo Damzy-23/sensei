@@ -25,6 +25,17 @@ test that stops it. Rows marked *not enforced yet* are rules we follow by review
 | Let an injection or off-topic message reach an agent | Classify first, stop the turn | `app/guards/input.py`; `test_blocked_input_never_reaches_an_agent` |
 | Leave a stuck or upset student with a bot | Escalate to a person on fixed triggers | `rules.should_escalate`; `test_still_stuck_after_level_five_escalates_to_a_mentor`, `test_three_blocked_messages_escalate` |
 
+## The interview panel
+
+| Don't | Do | Enforced by |
+|---|---|---|
+| Make the candidate wait for a second interviewer | The observer runs beside the lead, not after | `asyncio.gather` in `app/orchestrator/turn.py` |
+| Let a failing observer break the interview | Its failure is on the trace; the reply still arrives | `tests/test_panel.py::test_a_failing_observer_never_costs_the_candidate_their_reply` |
+| Let a model make up a score | Scores come from the ratings by a fixed formula | `app/orchestrator/panel.py::scores`; `test_scores_come_from_the_ratings_and_unobserved_dimensions_have_none` |
+| Score what was never seen | An unobserved dimension has no score | Same test; the UI prints "not observed" |
+| Show the candidate code in a note or in the feedback | Drop the note; withhold the feedback | `leak.keep_safe_notes`; `test_a_note_containing_code_is_dropped_before_the_candidate_sees_it`, `test_feedback_containing_code_is_withheld` |
+| Let a note name the technique that solves it | The observer describes behaviour only | The observer's prompt. *Not enforced beyond the code check* |
+
 ## The browser and voice agent
 
 | Don't | Do | Enforced by |

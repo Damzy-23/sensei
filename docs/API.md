@@ -153,6 +153,48 @@ Phase 3 will return 12 problems across two pointers, sliding window, hash map, s
 
 ---
 
+## Interview panel
+
+In `interview`, `blitz` and `call` modes two interviewers work on every turn: the lead
+answers, and an observer notes what the candidate did. They run side by side, so the
+second one adds no wait. The observer never speaks in the conversation.
+
+### `GET /sessions/{session_id}/panel` → 200
+```json
+{
+  "active": true,
+  "notes": [
+    { "dimension": "complexity", "rating": 1, "note": "You stated the cost before writing any code." }
+  ],
+  "scores": {
+    "communication": { "score": null, "signals": 0 },
+    "approach": { "score": null, "signals": 0 },
+    "correctness": { "score": null, "signals": 0 },
+    "complexity": { "score": 4.0, "signals": 1 }
+  }
+}
+```
+- `rating`: `1` a strength, `0` mixed, `-1` to work on.
+- `score`: 1.0 to 4.0, computed as `2.5 + 1.5 × mean(rating)`. **`null` means not observed**, not zero.
+- Notes are cleared when the session moves to a new problem. A note containing code is dropped.
+
+### `POST /sessions/{session_id}/debrief` → 200 | 409 | 502
+Ends the interview. The evaluator writes the feedback from the notes; the scores are the same
+computed ones.
+```json
+{
+  "summary": "You started well: ...",
+  "strengths": ["..."], "work_on": ["..."], "interviewers_look_for": ["..."],
+  "scores": { "approach": { "score": 1.0, "signals": 1 } },
+  "notes_used": 4,
+  "trace_id": "trc_..."
+}
+```
+`409` when there are no notes yet. `502 {"detail": {"message", "trace_id"}}` when the model
+fails or the feedback contained code and was withheld.
+
+---
+
 ## Tracks
 
 ### `GET /tracks` → 200

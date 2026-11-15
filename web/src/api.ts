@@ -70,6 +70,17 @@ export const listTickets = () => request<Ticket[]>("/mentor/tickets");
 export const getMentorMessages = (sessionId: string) => request<ChatMessage[]>(`/sessions/${sessionId}/mentor-messages`);
 export const getTicket = (ticketId: string) => request<TicketDetail>(`/mentor/tickets/${ticketId}`);
 export const replyTicket = (ticketId: string, text: string) => post<ChatMessage>(`/mentor/tickets/${ticketId}/reply`, { text });
+export type Dimension = "communication" | "approach" | "correctness" | "complexity";
+export interface PanelNote { dimension: Dimension; rating: -1 | 0 | 1; note: string }
+/** `score` is null when the dimension has not been observed: unknown, not zero. */
+export interface DimensionScore { score: number | null; signals: number }
+export interface PanelView { active: boolean; notes: PanelNote[]; scores: Record<Dimension, DimensionScore> }
+export interface Debrief {
+  summary: string; strengths: string[]; work_on: string[]; interviewers_look_for: string[];
+  scores: Record<Dimension, DimensionScore>; notes_used: number; trace_id: string;
+}
+export const getPanel = (sessionId: string) => request<PanelView>(`/sessions/${sessionId}/panel`);
+export const postDebrief = (sessionId: string) => post<Debrief>(`/sessions/${sessionId}/debrief`);
 export const startVoiceSession = () => post<{ signed_url: string; agent_id: string }>("/voice/session");
 export interface ActorSummary { actor: string; events: number; model_calls: number; tool_calls: number; blocked: number; errors: number; tokens_in: number; tokens_out: number; cost_usd: number }
 export interface ActivityLog { events: TraceEvent[]; summary: ActorSummary[]; durable: boolean }
