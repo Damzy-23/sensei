@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api import eval as eval_routes
-from app.api import mentor, problems, sessions, traces, tracks
+from app.api import cv, mentor, problems, sessions, traces, tracks, voice
 
 app = FastAPI(title="Senior API", version="0.1.0")
 
@@ -22,5 +22,5 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (sessions, problems, tracks, traces, mentor, eval_routes):
+for module in (sessions, problems, tracks, traces, mentor, voice, cv, eval_routes):
     app.include_router(module.router)

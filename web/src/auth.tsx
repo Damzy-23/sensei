@@ -4,6 +4,7 @@ import {
 } from "firebase/auth";
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { auth } from "./firebase";
+import { Landing } from "./pages/Landing";
 
 interface AuthState { user: User | null; guest: boolean; signOut: () => void }
 const Ctx = createContext<AuthState>({ user: null, guest: false, signOut: () => undefined });
@@ -73,10 +74,11 @@ function SignIn({ onGuest }: { onGuest: () => void }) {
 export function AuthGate({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null | undefined>(undefined); // undefined = still checking
   const [guest, setGuest] = useState(false);
+  const [started, setStarted] = useState(false);
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
   if (user === undefined) return <main className="page"><span className="muted">Checking your sign-in…</span></main>;
-  if (!user && !guest) return <SignIn onGuest={() => setGuest(true)} />;
-  const leave = () => { setGuest(false); void signOut(auth); };
+  if (!user && !guest) return started ? <SignIn onGuest={() => setGuest(true)} /> : <Landing onStart={() => setStarted(true)} />;
+  const leave = () => { setGuest(false); setStarted(true); void signOut(auth); };
   return <Ctx.Provider value={{ user: user ?? null, guest, signOut: leave }}>{children}</Ctx.Provider>;
 }

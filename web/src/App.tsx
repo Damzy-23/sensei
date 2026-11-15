@@ -1,6 +1,8 @@
 import { useApp, type PageId } from "./app-context";
+import { VoiceAgent } from "./agent/VoiceAgent";
 import { useAuth } from "./auth";
 import { Blitz } from "./pages/Blitz";
+import { CvStudio } from "./pages/CvStudio";
 import { Inspector } from "./pages/Inspector";
 import { Mentor } from "./pages/Mentor";
 import { Tracks } from "./pages/Tracks";
@@ -10,6 +12,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: "workspace", label: "Workspace" },
   { id: "tracks", label: "Learn path" },
   { id: "blitz", label: "Blitz lab" },
+  { id: "cv", label: "CV studio" },
   { id: "inspector", label: "Agent inspector" },
   { id: "mentor", label: "Mentor" },
 ];
@@ -45,6 +48,7 @@ export function App() {
           ))}
         </nav>
         <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+          <VoiceAgent />
           <span className="muted" style={{ fontSize: 12 }}>{user ? user.displayName ?? user.email : "Guest"}</span>
           <button className="btn-ghost" style={{ height: 36 }} onClick={signOut}>{user ? "Sign out" : "Sign in"}</button>
         </div>
@@ -54,6 +58,7 @@ export function App() {
       <div style={{ display: page === "workspace" ? "contents" : "none" }}><Workspace /></div>
       {page === "tracks" && <Tracks />}
       {page === "blitz" && <Blitz />}
+      {page === "cv" && <CvStudio />}
       {page === "inspector" && <Inspector />}
       {page === "mentor" && <Mentor />}
     </div>

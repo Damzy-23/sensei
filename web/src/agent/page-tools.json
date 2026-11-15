@@ -1,0 +1,38 @@
+{
+  "get_page_state": {
+    "description": "Read what the student currently sees: screen, mode, problem, hint level and last test run. Call this before acting on the page.",
+    "parameters": {}
+  },
+  "navigate": {
+    "description": "Switch screen.",
+    "parameters": { "page": { "type": "string", "enum": ["workspace", "tracks", "blitz", "cv", "inspector", "mentor"], "description": "The screen to show." } }
+  },
+  "set_mode": {
+    "description": "Start a new session in a mode: learn (hint coach), interview, blitz (timed interview) or call (phone-style interview).",
+    "parameters": { "mode": { "type": "string", "enum": ["learn", "interview", "blitz", "call"], "description": "The mode to start." } }
+  },
+  "open_problem": {
+    "description": "Open a problem in the workspace by its id, for example two-sum or valid-parentheses.",
+    "parameters": { "problem_id": { "type": "string", "description": "The problem id, lower case with hyphens." } }
+  },
+  "ask_coach": {
+    "description": "Send the student's words to the coach or interviewer and return the reply. Use this for anything about the problem or their code. Never answer those yourself.",
+    "parameters": { "text": { "type": "string", "description": "What the student said, in their words." } }
+  },
+  "run_tests": {
+    "description": "Run the student's code against the visible tests and return how many passed and failed.",
+    "parameters": {}
+  },
+  "highlight_lines": {
+    "description": "Point at a range of lines in the student's code with a short note.",
+    "parameters": {
+      "from": { "type": "integer", "description": "First line, counting from 1." },
+      "to": { "type": "integer", "description": "Last line." },
+      "note": { "type": "string", "description": "One short sentence about those lines. No code." }
+    }
+  },
+  "clear_highlight": {
+    "description": "Remove the code highlight.",
+    "parameters": {}
+  }
+}

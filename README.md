@@ -29,6 +29,11 @@ to trust when nobody can see why it said what it said or what it cost.
 - **Agent inspector.** Each turn is a trace tree streamed live: agent, action, model,
   tokens, cost in USD, latency, and the decision with its reason.
 - **Tracks.** Blind 75 and NeetCode 150.
+- **Voice guide.** Talk to Senior: a voice agent that operates the page through typed tools
+  (open a problem, switch mode, run tests) and passes problem questions to the coach.
+- **Phone-style interview.** Call mode: an interviewer whose replies are written to be spoken.
+- **CV studio.** Paste a job description and your CV; get the CV rewritten for the role from
+  your own facts only, with the gaps listed, and save it as a PDF.
 
 ## How it works
 
@@ -56,19 +61,25 @@ Interactive API docs: http://localhost:8000/docs
 
 | | |
 |---|---|
-| Models | Claude Sonnet 5.5 (hint coach, interviewer) and Claude Haiku 5.5 (input guard), through the Anthropic API |
+| Models | Claude Sonnet 5.5 (hint coach, interviewer, caller, CV writer) and Claude Haiku 5.5 (input guard), through the Anthropic API. The voice guide runs on ElevenLabs Agents with its default model (`deepseek-v41-flash`) |
+| Services | ElevenLabs Agents (voice), Firebase Hosting and Authentication, Cloudflare Tunnel |
 | Libraries | FastAPI, Pydantic, Uvicorn, httpx, PyYAML, the Anthropic Python SDK, pytest |
 | Data | Problem lists: Blind 75 and NeetCode 150 (public lists; titles, difficulty and topic only) |
 
 ## Status
 
-Built and tested: the turn loop for learn, interview and blitz modes, both guards,
-escalation and the mentor queue, test-run handling with mastery, tracing with cost,
-and the track catalogue.
+Built and tested: the turn loop for learn, interview, blitz and call modes, both guards,
+escalation and the mentor queue, test-run handling with mastery, tracing with cost, the
+track catalogue, the CV studio, and the web app (workspace, learn path, blitz lab, CV studio,
+agent inspector, mentor queue, landing page, sign-in).
 
-Not built yet: the evaluator and planner agents, the tuned-versus-base hint model
-evaluation (`/eval/results` returns placeholder data), a frontend, and full
-statements and tests for most track problems (two have them).
+Built, partly verified: the voice guide connects, speaks and listens. Its tool calls by
+voice have not been tested with a real speaker.
+
+Not built yet: phone calls (needs a phone number on the voice provider), the evaluator and
+planner agents, the tuned-versus-base hint model evaluation (`/eval/results` returns
+placeholder data), diagrams, generated video, and full statements and tests for most
+track problems (two have them).
 
 ## Live demo
 
