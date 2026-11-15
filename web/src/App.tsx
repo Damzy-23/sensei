@@ -52,9 +52,9 @@ export function App() {
             </button>
           ))}
         </nav>
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 12 }}>
+        <div className="topbar-actions">
           <VoiceAgent />
-          <span className="muted" style={{ fontSize: 12 }}>{user ? user.displayName ?? user.email : "Guest"}</span>
+          <span className="muted topbar-user">{user ? user.displayName ?? user.email : "Guest"}</span>
           <button className="btn-ghost" style={{ height: 36 }} onClick={signOut}>{user ? "Sign out" : "Sign in"}</button>
         </div>
       </header>

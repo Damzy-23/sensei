@@ -80,7 +80,7 @@ function Control() {
   const live = status === "connected";
   const label = live ? "Hang up" : starting || status === "connecting" ? "Connecting…" : "Call Senior";
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+    <div className="voice-bar">
       {live && (
         <span className="pill baltic" aria-live="polite">
           <span className="live-dot" style={{ background: "var(--baltic)" }} />
@@ -88,20 +88,20 @@ function Control() {
         </span>
       )}
       {live && (
-        <form style={{ display: "flex", gap: 6 }} onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { sendUserMessage(typed.trim()); setTyped(""); } }}>
+        <form className="voice-type" onSubmit={(e) => { e.preventDefault(); if (typed.trim()) { sendUserMessage(typed.trim()); setTyped(""); } }}>
           <label className="dim" style={{ fontSize: 12, alignSelf: "center" }} htmlFor="voice-text">Or type</label>
-          <input id="voice-text" className="input" style={{ width: 220, height: 36, padding: "0 10px" }} value={typed}
+          <input id="voice-text" className="input voice-text" value={typed}
             placeholder="Open two sum…" onChange={(e) => setTyped(e.target.value)} />
         </form>
       )}
       {error && <span className="pill sky" role="alert" title={error}>Voice problem: {error.slice(0, 60)}</span>}
       {!live && (
         <>
-          <label className="dim" style={{ fontSize: 12 }} htmlFor="voice-name">Your name</label>
-          <input id="voice-name" className="input" style={{ width: 120, height: 36, padding: "0 10px" }} value={name}
+          <label className="dim voice-label" htmlFor="voice-name">Your name</label>
+          <input id="voice-name" className="input voice-name" value={name}
             placeholder="or say it" onChange={(e) => setName(e.target.value)} />
-          <label className="dim" style={{ fontSize: 12 }} htmlFor="voice-persona">Coach</label>
-          <select id="voice-persona" className="select" style={{ width: 110, height: 36, padding: "0 8px" }} value={personaId}
+          <label className="dim voice-label" htmlFor="voice-persona">Coach</label>
+          <select id="voice-persona" className="select voice-persona" value={personaId}
             title={personas[personaId].blurb} onChange={(e) => setPersonaId(e.target.value as PersonaId)}>
             {PERSONA_IDS.map((id) => <option key={id} value={id}>{personas[id].label}</option>)}
           </select>
