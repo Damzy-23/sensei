@@ -3,6 +3,7 @@ import { AUTH_ON, useAuth } from "./auth";
 import { Blitz } from "./pages/Blitz";
 import { Inspector } from "./pages/Inspector";
 import { Mentor } from "./pages/Mentor";
+import { Profile } from "./pages/Profile";
 import { Tracks } from "./pages/Tracks";
 import { Workspace } from "./pages/Workspace";
 
@@ -10,6 +11,7 @@ const NAV: { id: PageId; label: string }[] = [
   { id: "workspace", label: "Workspace" },
   { id: "tracks", label: "Learn path" },
   { id: "blitz", label: "Blitz lab" },
+  { id: "profile", label: "Profile" },
   { id: "inspector", label: "Agent inspector" },
   { id: "mentor", label: "Mentor" },
 ];
@@ -65,6 +67,8 @@ export function App() {
       <div style={{ display: page === "workspace" ? "contents" : "none" }}><Workspace /></div>
       {page === "tracks" && <Tracks />}
       {page === "blitz" && <Blitz />}
+      {/* Profile stays mounted too, so an interview in progress is not lost. */}
+      <div style={{ display: page === "profile" ? "contents" : "none" }}><Profile /></div>
       {page === "inspector" && <Inspector />}
       {page === "mentor" && <Mentor />}
     </div>

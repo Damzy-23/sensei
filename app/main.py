@@ -14,7 +14,7 @@ from fastapi.staticfiles import StaticFiles
 
 from app.api import eval as eval_routes
 from app.api.auth import require_user
-from app.api import mentor, problems, sessions, traces, tracks
+from app.api import mentor, problems, profile, sessions, traces, tracks
 
 app = FastAPI(title="Senior API", version="0.1.0")
 
@@ -26,7 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-for module in (sessions, problems, tracks, traces, mentor, eval_routes):
+for module in (sessions, problems, tracks, traces, mentor, profile, eval_routes):
     app.include_router(module.router, dependencies=[Depends(require_user)])
 
 

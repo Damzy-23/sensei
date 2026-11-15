@@ -23,6 +23,7 @@ Actor = Literal[
     "planner",
     "mentor",
     "escalation",
+    "career_agent",
 ]
 EventType = Literal[
     "turn.start",
@@ -246,3 +247,63 @@ class EvalResults(BaseModel):
     base: Optional[EvalModelStats] = None
     tuned: Optional[EvalModelStats] = None
     examples: list[EvalExample]
+
+
+# --- Profile: the career agent interviews the student, then searches the web for roles ---
+
+
+class ProfileStartIn(BaseModel):
+    session_id: str | None = Field(default=None, description="Optional app session, so the career agent's trace shows in the inspector.")
+
+
+class ProfileAnswerIn(BaseModel):
+    text: str = Field(min_length=1, max_length=2000)
+
+
+class ProfileQA(BaseModel):
+    topic: str
+    question: str
+    answer: str | None = None
+
+
+class ProfileTurn(BaseModel):
+    profile_id: str
+    step: int = Field(description="Questions answered so far.")
+    total: int = Field(description="Questions in the interview.")
+    question: str | None = Field(description="The next question, or null when the interview is done.")
+    done: bool
+    trace_id: str | None = None
+
+
+class Source(BaseModel):
+    title: str
+    url: str
+
+
+class RoleRecommendation(BaseModel):
+    title: str
+    fit: str = Field(description="Why this role suits the student, in their own terms.")
+    skills_to_strengthen: list[str]
+    sources: list[Source]
+
+
+class PracticePlan(BaseModel):
+    track_id: str
+    track_title: str
+    patterns: list[str]
+    why: str
+
+
+class ProfileResult(BaseModel):
+    profile_id: str
+    summary: str
+    roles: list[RoleRecommendation]
+    practice: PracticePlan
+    sources: list[Source]
+    trace_id: str | None = None
+
+
+class ProfileDetail(BaseModel):
+    profile_id: str
+    qa: list[ProfileQA]
+    result: ProfileResult | None = None

@@ -59,6 +59,7 @@ class SpanState:
     model: str | None = None
     tokens_in: int | None = None
     tokens_out: int | None = None
+    cost_usd: float | None = None  # set for priced calls that are not token-based (e.g. a web search)
 
 
 _trace: ContextVar[TraceCtx | None] = ContextVar("sensei_trace", default=None)
@@ -97,7 +98,7 @@ def _emit(tctx: TraceCtx, st: SpanState, event_type: EventType, latency_ms: floa
         model=st.model,
         tokens_in=st.tokens_in,
         tokens_out=st.tokens_out,
-        cost_usd=prices.cost_usd(st.model, st.tokens_in, st.tokens_out),
+        cost_usd=st.cost_usd if st.cost_usd is not None else prices.cost_usd(st.model, st.tokens_in, st.tokens_out),
         input=redact.sanitize(st.input),
         output=redact.sanitize(st.output),
         decision=redact.sanitize(st.decision),
