@@ -17,7 +17,7 @@ python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
 cp .env.example .env                                     # add ANTHROPIC_API_KEY to run real models
 python scripts/validate_bank.py                          # all 12 reference solutions must pass
-python -m pytest                                         # 252 tests, no network
+python -m pytest                                         # 267 tests, no network
 .venv\Scripts\python -m uvicorn app.main:app --port 8000
 ```
 

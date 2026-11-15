@@ -6,3 +6,4 @@ python-dotenv
 pyyaml
 anthropic
 pytest
+adaption==0.19.0

@@ -121,10 +121,14 @@ change the code and the test that pins it.
 
 ## Adaption
 
-- **Not built.** `docs/adaption.md` is missing, so the upload format, leaderboard submission and
-  any hosting requirement are unknown. The spec says to stop and ask in that case, so the upload
-  code and the record of how the model reaches the leaderboard are both outstanding. See
-  `docs/EVAL.md`.
+- **Built from the SDK, not run.** `docs/adaption.md` was written from the `adaption` SDK 0.19.0
+  and the public docs, because the spec's file was missing. The pipeline is raw upload with an
+  explicit prompt/completion mapping, then an AutoScientist run, then download. Tests use a fake
+  client. Nothing has been uploaded: there is no `ADAPTION_API_KEY` in this environment yet.
+- **No leaderboard step.** The SDK has no leaderboard call, and `datasets.publish` returns 501. The
+  run record says `not submitted`. The organisers or Adaption support must confirm the process.
+- **Hosting is open.** The downloaded artifact must be served on an OpenAI-compatible endpoint
+  before it can be `hint_tuned`. The docs don't say how.
 
 ## Demo
 
