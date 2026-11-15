@@ -350,7 +350,7 @@ export function Workspace() {
             {bubbles.map((b) => (
               <div key={b.id} className={`bubble ${b.kind}`} role={b.kind === "notice" ? "alert" : undefined}>
                 {b.meta && <span className="bubble-meta">{b.meta}</span>}
-                {b.text}
+                <RichText text={b.text} />
               </div>
             ))}
             {busy && <div className="bubble coach thinking" role="status"><span className="dots" aria-hidden="true"><i /><i /><i /></span><span className="mono">{busy}</span></div>}
