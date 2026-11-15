@@ -28,6 +28,8 @@ def select_agent(session: Session) -> Decision:
         return Decision("interviewer", "mode.interview", "session is in interview mode")
     if session.mode == "blitz":
         return Decision("interviewer", "mode.blitz", "session is in blitz mode, timed")
+    if session.mode == "call":
+        return Decision("caller", "mode.call", "session is a live phone interview")
     return Decision("hint_coach", "mode.learn", "session is in learn mode")
 
 

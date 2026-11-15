@@ -1,6 +1,6 @@
-# Sensei architecture
+# Senior architecture
 
-Sensei is a coding-interview coach built as a small team of specialised agents.
+Senior is a coding-interview coach built as a small team of specialised agents.
 A supervisor routes each student message to one specialist. Guards check
 everything going in and coming out. Hard cases escalate to a human mentor.
 Every step is traced with the agent, model, tokens, cost, latency, and the
@@ -57,6 +57,16 @@ never call each other.
 | **Cooperation** | Supervisor pattern: the orchestrator hands each turn to exactly one specialist and escalates to a human on fixed triggers. | `app/orchestrator/turn.py`, `app/api/mentor.py` | Built |
 | **Guardrails** | Input classification, output leak check with rewrite, escalation policy, request validation, no solutions or hidden tests from any endpoint, secret redaction in logs. | `app/guards/`, `app/models.py`, `app/tracing/redact.py` | Built. The leak check is rule-based |
 | **Memory** | Short-term: session state and transcript. Long-term: mastery per pattern. One repository interface over the store. | `app/memory/repository.py`, `app/db.py` | Built on SQLite. Mastery is per session until accounts exist |
+
+### Memory, by type
+
+| Type | In Senior | Where | Status |
+|---|---|---|---|
+| Short-term | The last 8 messages of the conversation and the session counters (mode, hint level, failed runs) | `memory.transcript`, `memory.Session` | Built |
+| Long-term | Mastery per pattern, mentor tickets, and every trace | `Session.mastery`, `tickets`, `events` tables | Built, but scoped to one session until accounts exist |
+| Entity | The things a turn is about: the problem (title, pattern, difficulty, statement) and the student's current code | `app/catalog.py`, `Session.latest_code` | Built |
+| Contextual | What one agent is handed for one turn, assembled from the three above and nothing more | `app/agents/context.py` | Built |
+| User | Who the student is across sessions: level, target role, preferred language | none | Not built: needs accounts |
 
 ### Not one of the six
 

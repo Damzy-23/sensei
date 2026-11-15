@@ -1,6 +1,8 @@
-# Sensei
+# Senior
 
-A coding-interview coach built as a small team of AI agents. Sensei gives graded,
+> Working name. The repository and the `SENSEI_*` settings keep the earlier name, Sensei, for now.
+
+A coding-interview coach built as a small team of AI agents. Senior gives graded,
 Socratic hints instead of answers, runs mock interviews, hands a stuck student to
 a human mentor, and shows every step the agents took: which agent, which model,
 how many tokens, what it cost, and why.

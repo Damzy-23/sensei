@@ -1,4 +1,4 @@
-# Sensei API
+# Senior API
 
 Base URL (dev): `http://localhost:8000`. All bodies are JSON. CORS is open for development.
 With `SENSEI_USE_STUBS=1` (the default) responses are **stub data**. With `SENSEI_USE_STUBS=0` the

@@ -256,3 +256,12 @@ def test_an_unexpected_failure_also_ends_with_a_named_error(client: TestClient) 
     assert events[-1][0] == "error" and "authentication" in events[-1][1]["message"]
     turn_end = [d for n, d in events if n == "trace" and d["type"] == "turn.end"][0]
     assert turn_end["status"] == "error"
+
+
+def test_call_mode_routes_to_the_phone_interviewer(client: TestClient) -> None:
+    sid = _new(client, mode="call")
+    traces = {t["name"]: t for n, t in _send(client, sid) if n == "trace"}
+    assert traces["select_agent"]["decision"] == "caller"
+    assert traces["select_agent"]["reason"].startswith("rule mode.call")
+    assert "caller" in traces and "interviewer" not in traces and "hint_coach" not in traces
+    assert "leak_check" in traces  # spoken replies pass the same output guard

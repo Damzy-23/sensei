@@ -1,4 +1,4 @@
-"""Sensei FastAPI app: builds the application and mounts the routers in app/api/.
+"""Senior FastAPI app: builds the application and mounts the routers in app/api/.
 
 Phase 1: every endpoint from docs/API.md, served from stubs. Architecture and
 layering rules: docs/ARCHITECTURE.md.
@@ -12,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api import eval as eval_routes
 from app.api import mentor, problems, sessions, traces, tracks
 
-app = FastAPI(title="Sensei API", version="0.1.0")
+app = FastAPI(title="Senior API", version="0.1.0")
 
 # Open CORS for development (hackathon scope).
 app.add_middleware(

@@ -11,12 +11,13 @@ from typing import Literal, Optional
 from pydantic import BaseModel, Field
 
 Difficulty = Literal["easy", "medium", "hard"]
-Mode = Literal["learn", "interview", "blitz"]
+Mode = Literal["learn", "interview", "blitz", "call"]
 Actor = Literal[
     "client",
     "guard",
     "orchestrator",
     "interviewer",
+    "caller",
     "hint_coach",
     "evaluator",
     "planner",

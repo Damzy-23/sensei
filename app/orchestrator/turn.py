@@ -7,7 +7,7 @@ input guard -> agent selection -> hint ladder -> one specialist -> output guard
 from __future__ import annotations
 
 from app import catalog
-from app.agents import hint_coach, interviewer
+from app.agents import caller, hint_coach, interviewer
 from app.agents.context import AgentContext
 from app.guards import input as input_guard
 from app.guards import leak, policy
@@ -19,7 +19,7 @@ from app.tools.escalation import escalate_to_mentor
 from app.tools.mastery import update_mastery
 from app.tracing.context import span, turn
 
-AGENTS = {"hint_coach": hint_coach.respond, "interviewer": interviewer.respond}
+AGENTS = {"hint_coach": hint_coach.respond, "interviewer": interviewer.respond, "caller": caller.respond}
 HISTORY_TURNS = 8
 
 
