@@ -6,3 +6,7 @@ __pycache__/
 data/sensei.db
 data/sensei.db-wal
 data/sensei.db-shm
+.venv
+node_modules/
+node_modules
+web/dist/

@@ -1,0 +1,10 @@
+.git
+.venv
+.env
+**/__pycache__
+.pytest_cache
+web/node_modules
+web/dist
+data/sensei.db*
+tests
+docs

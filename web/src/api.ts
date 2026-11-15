@@ -1,6 +1,7 @@
 // Typed client for the Senior API. Shapes mirror docs/API.md.
 
-export const API_URL: string = import.meta.env.VITE_API_URL ?? "http://localhost:8000";
+// Same origin in a production build (FastAPI serves the app); the local API in dev.
+export const API_URL: string = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? "http://localhost:8000" : "");
 
 export type Mode = "learn" | "interview" | "blitz" | "call";
 export type Difficulty = "easy" | "medium" | "hard";
