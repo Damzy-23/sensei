@@ -22,7 +22,8 @@ class FakeModel:
         self.category_confidence: float = 0.9
         self.leaks: bool = False
         self.hint_text: Callable[[int, bool], str] = lambda level, stricter: (
-            "Name the pattern family you would reach for first." if not stricter
+            f"Level {level} nudge: think about what you need to remember as you scan the input."
+            if not stricter
             else "Think about what you need to remember as you scan."
         )
         self.hint_level_override: int | None = None

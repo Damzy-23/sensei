@@ -59,8 +59,11 @@ async def classify_input(session_id: str, text: str, regex_category: str | None)
             # Classifier unavailable: rely on the regex rules alone, and say so in the trace.
             model_category, model_conf = None, 0.0
 
-    # An injection found by regex_precheck is trusted without a second check.
-    regex_hit = RegexHit("injection", "regex_precheck", text[:40]) if regex_category == "injection" else regex_rules(text)
+    # An injection found by regex_precheck is trusted without a second check. The rule name is
+    # looked up from the text so the trace says which rule fired.
+    regex_hit = regex_rules(text)
+    if regex_category == "injection" and regex_hit is None:
+        regex_hit = RegexHit("injection", "regex_precheck", text[:40])
     verdict = decide_input(regex_hit, model_category, model_conf, min_conf)
     if st is not None:
         st.decision = verdict.decision
