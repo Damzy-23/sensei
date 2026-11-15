@@ -1,0 +1,28 @@
+# Model registry. Keys are used by app/llm/client.py call(model_key, ...).
+# *_env names are read from the environment at call time; *_default is used if unset.
+#
+#   reasoning   Anthropic reasoning model (complex analysis, judges, data generation)
+#   fast        Anthropic fast model (guard classification)
+#   hint_base   Model used for hints when HINT_MODEL=base (same as reasoning)
+#   hint_tuned  OpenAI-compatible endpoint serving the fine-tuned hint model (HINT_MODEL=tuned)
+
+reasoning:
+  provider: anthropic
+  model_env: ANTHROPIC_MODEL_REASONING
+  model_default: claude-sonnet-5-5
+
+fast:
+  provider: anthropic
+  model_env: ANTHROPIC_MODEL_FAST
+  model_default: claude-haiku-5-5
+
+hint_base:
+  provider: anthropic
+  model_env: ANTHROPIC_MODEL_REASONING
+  model_default: claude-sonnet-5-5
+
+hint_tuned:
+  provider: openai_compatible
+  base_url_env: HINT_TUNED_BASE_URL
+  api_key_env: HINT_TUNED_API_KEY
+  model_env: HINT_TUNED_MODEL
