@@ -175,6 +175,23 @@ def list_hints(session_id: str) -> list[dict[str, Any]]:
     return _rows("SELECT * FROM hints WHERE session_id = ? ORDER BY rowid", (session_id,))
 
 
+def last_unlock_at(session_id: str) -> str | None:
+    rows = _rows("SELECT created_at FROM hints WHERE session_id = ? ORDER BY rowid DESC LIMIT 1", (session_id,))
+    return rows[0]["created_at"] if rows else None
+
+
+def failed_runs_since(session_id: str, since: str | None) -> int:
+    """Failed runs created after `since` (all failed runs when since is None)."""
+    if since is None:
+        rows = _rows("SELECT COUNT(*) AS n FROM runs WHERE session_id = ? AND failed > 0", (session_id,))
+    else:
+        rows = _rows(
+            "SELECT COUNT(*) AS n FROM runs WHERE session_id = ? AND failed > 0 AND created_at > ?",
+            (session_id, since),
+        )
+    return int(rows[0]["n"])
+
+
 # ---------- mastery ----------
 
 
