@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --port 5173",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --port 5173"
+    "preview": "vite preview --port 5173",
+    "test": "node --test \"src/**/*.test.mjs\""
   },
   "dependencies": {
     "@elevenlabs/react": "^1.22.1",
