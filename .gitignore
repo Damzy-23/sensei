@@ -10,3 +10,4 @@ data/sensei.db-shm
 node_modules/
 node_modules
 web/dist/
+.firebase/
