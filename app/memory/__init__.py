@@ -5,7 +5,9 @@
 - Long-term: mastery per pattern, which the planner reads.
 
 Everything sits behind one repository interface so the store can change
-(SQLite today in app.db, Firestore on Cloud Run) without touching the agents.
+without touching the agents. SQLite (app.db) is the store every read uses;
+on Cloud Run each write is also mirrored to Firestore (durable.py) and
+restored on demand, so memory survives a restart of the container.
 The API holds no state between requests: each turn loads state, applies the
 event, and saves the new state.
 """

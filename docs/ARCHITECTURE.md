@@ -57,7 +57,7 @@ never call each other.
 | **Tools** | Typed calls: read problem and visible tests, read the latest run, update mastery, escalate to mentor. Escalation is a tool, so human-in-the-loop is a traced call. | `app/tools/` | `escalate_to_mentor` and `update_mastery` built |
 | **Cooperation** | Supervisor pattern: the orchestrator hands each turn to exactly one specialist and escalates to a human on fixed triggers. | `app/orchestrator/turn.py`, `app/api/mentor.py` | Built |
 | **Guardrails** | Input classification, output leak check with rewrite, escalation policy, request validation, no solutions or hidden tests from any endpoint, secret redaction in logs. | `app/guards/`, `app/models.py`, `app/tracing/redact.py` | Built. The leak check is rule-based |
-| **Memory** | Short-term: session state and transcript. Long-term: mastery per pattern. One repository interface over the store. | `app/memory/repository.py`, `app/db.py` | Built on SQLite. Mastery is per session until accounts exist |
+| **Memory** | Short-term: session state and transcript. Long-term: mastery per pattern. One repository interface over the store. | `app/memory/repository.py`, `app/memory/durable.py`, `app/db.py` | Built on SQLite, mirrored to Firestore and restored on demand after a restart. Mastery is per session until accounts exist |
 
 ### Memory, by type
 
@@ -68,6 +68,37 @@ never call each other.
 | Entity | The things a turn is about: the problem (title, pattern, difficulty, statement) and the student's current code | `app/catalog.py`, `Session.latest_code` | Built |
 | Contextual | What one agent is handed for one turn, assembled from the three above and nothing more | `app/agents/context.py` | Built |
 | User | Who the student is across sessions: level, target role, preferred language | none | Not built: needs accounts |
+
+### Memory across a restart
+
+The service runs as one container, and its SQLite file starts empty on every
+deploy. So that a deploy does not end every conversation:
+
+- **Mirrored on write.** Each write of a session, a message or a mentor ticket
+  is also queued for Firestore (collections `state_sessions`, `state_messages`,
+  `state_tickets`). A background thread sends the queue: a reply never waits on
+  Firestore, and a write that fails is logged, not raised.
+- **Restored on demand.** SQLite stays the store every read uses. When a
+  session is asked for and SQLite does not have it, the session, its whole
+  transcript and its tickets are copied back from Firestore in one transaction
+  and the request carries on. The mentor queue comes back the same way: its
+  newest 200 tickets, once per process, the first time it is listed. This
+  recovery read is the only time a request waits on Firestore. It gives up
+  after 5 seconds, and then the session is "not found", as it was before.
+- **On when** `SENSEI_STATE_FIRESTORE_DB` names a Firestore database, or
+  failing that `SENSEI_LOG_FIRESTORE_DB` (the activity log's database). Always
+  off with `SENSEI_USE_STUBS=1`.
+
+Still lost:
+
+- Trace events are not restored. The inspector for a restored session starts
+  empty; the events are still in the activity log (`/logs`).
+- The last writes before a crash, because writes are queued. A clean shutdown
+  waits up to 5 seconds for the queue to empty.
+- A session is restored once, when it is first asked for. What the old
+  container writes after that (a turn still running during a deploy) is not
+  picked up.
+- Career profiles (`app/memory/profiles.py`) are not mirrored.
 
 ### Not one of the six
 

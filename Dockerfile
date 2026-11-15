@@ -17,4 +17,6 @@ COPY config/ config/
 COPY data/tracks/ data/tracks/
 COPY data/problems.json data/problems.json
 COPY --from=web /web/dist web/dist
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# exec: the server itself receives the stop signal on a deploy, so it shuts down cleanly and
+# sends what is still queued for the durable copy (app.memory.durable) before it exits.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
