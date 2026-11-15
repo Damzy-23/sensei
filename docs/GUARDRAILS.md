@@ -20,8 +20,8 @@ test that stops it. Rows marked *not enforced yet* are rules we follow by review
 | Don't | Do | Enforced by |
 |---|---|---|
 | Give the answer | Hints in words, on a ladder from 1 to 5 | `app/guards/leak.py`; `test_leaked_code_is_blocked_and_rewritten`, `test_a_reply_that_keeps_leaking_falls_back_to_a_safe_message` |
-| Give code before the student has tried | One line per turn, only after three tries (requests for help plus failed runs) | `rules.code_help`; `test_code_is_not_given_before_the_student_has_tried`, `test_after_three_tries_the_coach_may_give_one_line` |
-| Hand over the solution a line at a time | One line per reply, three lines per problem | `leak.decide`, `policy.CODE_LINES_PER_PROBLEM`; `test_even_when_earned_it_is_one_line_not_two`, `test_code_help_stops_at_three_lines_a_problem_and_resets_on_a_new_one` |
+| Volunteer code before the student has tried | Unasked, a line is offered only after three tries (messages plus failed runs). A student who asks gets one line | `rules.code_help`; `test_code_is_not_volunteered_before_the_student_has_tried`, `test_a_student_who_asks_for_a_line_gets_one_line`, `test_after_three_tries_the_coach_may_give_one_line` |
+| Hand over the solution | One line per reply and three per problem, even when they ask for all of it | `leak.decide`, `policy.CODE_LINES_PER_PROBLEM`; `test_asking_still_gets_one_line_not_the_solution`, `test_even_when_earned_it_is_one_line_not_two`, `test_code_help_stops_at_three_lines_a_problem_and_resets_on_a_new_one` |
 | Give code in an interview | Never, however often they ask | `test_no_code_in_an_interview_however_often_they_ask` |
 | Jump up the hint ladder | One step per request for help | `rules.next_hint_level`; `test_hint_ladder_climbs_one_level_per_request_and_resets_on_new_problem` |
 | Return reference solutions, hidden tests or prompts | Response models have no field for them | `app/models.py`; `tests/test_api_stubs.py` |
