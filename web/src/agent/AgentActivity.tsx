@@ -1,8 +1,8 @@
 // What the voice coach just did on the page: the most recent action only, whether it worked,
 // and how long it took. It shows the agent's actions, not its private reasoning.
-// It appears when the agent acts and leaves by itself a second later; hovering keeps it open.
+// It stays on screen and always shows one line. "Always hide" turns it off for good.
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { onToolCall, type ToolCall, type ToolName } from "./tools";
 
 
@@ -32,8 +32,6 @@ const PLAIN: Record<ToolName, string> = {
   write_line: "Wrote a line into your code",
 };
 
-const SHOW_MS = 1000; // how long the panel stays after the last action
-const SHOW_FAILURE_MS = 4000; // a failure stays longer: it is the one thing worth reading
 const OFF_KEY = "senior.activity.off";
 
 function savedOff(): boolean {
@@ -42,29 +40,13 @@ function savedOff(): boolean {
 
 export function AgentActivity() {
   const [latest, setLatest] = useState<ToolCall | null>(null); // one line: the most recent action only
-  const [visible, setVisible] = useState(false);
   const [off, setOff] = useState(savedOff);
-  const timer = useRef<number | undefined>(undefined);
-  const hovering = useRef(false);
 
-  const hideLater = (ms: number) => {
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => { if (!hovering.current) setVisible(false); }, ms);
-  };
-
-  useEffect(() => {
-    const stop = onToolCall((call) => {
-      setLatest(call);
-      setVisible(true);
-      hideLater(call.ok ? SHOW_MS : SHOW_FAILURE_MS);
-    });
-    return () => { stop(); window.clearTimeout(timer.current); };
-  }, []);
+  useEffect(() => onToolCall(setLatest), []);
 
   const turnOff = (next: boolean) => {
     setOff(next);
     try { localStorage.setItem(OFF_KEY, next ? "1" : "0"); } catch { /* private window: lasts for this visit only */ }
-    if (!next && latest) { setVisible(true); hideLater(SHOW_FAILURE_MS); }
   };
 
   if (off) {
@@ -76,11 +58,9 @@ export function AgentActivity() {
       </button>
     );
   }
-  if (!latest || !visible) return null;
+  if (!latest) return null;
   return (
-    <aside className="agent-activity" aria-label="What Senior is doing" aria-live="polite"
-      onMouseEnter={() => { hovering.current = true; window.clearTimeout(timer.current); }}
-      onMouseLeave={() => { hovering.current = false; hideLater(SHOW_MS); }}>
+    <aside className="agent-activity" aria-label="What Senior is doing" aria-live="polite">
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span className="label">Senior is doing</span>
         <button className="btn-ghost" style={{ height: 28, marginLeft: "auto", padding: "0 10px" }} onClick={() => turnOff(true)}>Always hide</button>

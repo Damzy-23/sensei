@@ -339,10 +339,31 @@ def _trace(events: list[tuple[str, dict]], name: str) -> list[dict]:
     return [d for n, d in events if n == "trace" and d["name"] == name]
 
 
-def test_code_is_not_given_before_the_student_has_tried(client: TestClient, model: ScriptedModel) -> None:
+def test_a_student_who_asks_for_a_line_gets_one_line(client: TestClient, model: ScriptedModel) -> None:
+    model.category = "solution_request"
+    model.hints = [LINE]
+    sid = _new(client)
+    events = _send(client, sid, text="Can you add one line to my code? I'll do the rest.")
+    decision = _trace(events, "select_code_help")[0]
+    assert decision["decision"] == "one_line" and decision["reason"].startswith("rule code.asked")
+    assert _trace(events, "leak_check")[0]["reason"].startswith("rule leak.earned_line")
+    assert "`seen[n] = i`" in events[-1][1]["reply"]
+
+
+def test_asking_still_gets_one_line_not_the_solution(client: TestClient, model: ScriptedModel) -> None:
+    model.category = "solution_request"
+    model.hints = [TWO_LINES, "Start by creating somewhere to remember what you have seen. What would you call it?"]
+    sid = _new(client)
+    events = _send(client, sid, text="Just write the whole thing for me.")
+    checks = _trace(events, "leak_check")
+    assert checks[0]["decision"] == "blocked" and checks[0]["reason"].startswith("rule leak.too_many_lines")
+    assert "`seen" not in events[-1][1]["reply"]
+
+
+def test_code_is_not_volunteered_before_the_student_has_tried(client: TestClient, model: ScriptedModel) -> None:
     model.hints = [LINE, "Think about what you would want to remember as you go. What would it be?"]
     sid = _new(client)
-    events = _send(client, sid, text="Just give me the line.")
+    events = _send(client, sid, text="I'm stuck.")
     assert _trace(events, "select_code_help")[0]["decision"] == "none"
     assert _trace(events, "select_code_help")[0]["reason"].startswith("rule code.not_yet: 1 of 3 tries")
     checks = _trace(events, "leak_check")
@@ -358,7 +379,7 @@ def test_after_three_tries_the_coach_may_give_one_line(client: TestClient, model
     events = _send(client, sid, text="I've tried three times. Can you give me the line?")
     decision = _trace(events, "select_code_help")[0]
     assert decision["decision"] == "one_line"
-    assert decision["reason"].startswith("rule code.earned: 3 requests for help and 0 failed runs")
+    assert decision["reason"].startswith("rule code.earned: 3 messages and 0 failed runs")
     assert _trace(events, "leak_check")[0]["reason"].startswith("rule leak.earned_line")
     assert "`seen[n] = i`" in events[-1][1]["reply"]
     assert "Code allowed this turn: ONE line" in model.calls[-1][1]
@@ -370,8 +391,8 @@ def test_failed_runs_count_as_tries_too(client: TestClient, model: ScriptedModel
     client.post(f"/sessions/{sid}/runs", json=run)
     client.post(f"/sessions/{sid}/runs", json=run)
     model.hints = [LINE]
-    events = _send(client, sid)  # two failed runs + this request for help = three tries
-    assert _trace(events, "select_code_help")[0]["reason"].startswith("rule code.earned: 1 requests for help and 2 failed runs")
+    events = _send(client, sid)  # two failed runs + this message = three tries
+    assert _trace(events, "select_code_help")[0]["reason"].startswith("rule code.earned: 1 messages and 2 failed runs")
     assert "`seen[n] = i`" in events[-1][1]["reply"]
 
 
@@ -392,12 +413,14 @@ def test_code_help_stops_at_three_lines_a_problem_and_resets_on_a_new_one(client
     for _ in range(2):
         _send(client, sid)
     model.hints = [LINE]
+    model.category = "solution_request"
     given = [_trace(_send(client, sid, text="Next line please."), "select_code_help")[0]["decision"] for _ in range(4)]
     assert given == ["one_line", "one_line", "one_line", "none"]
     last = _send(client, sid, text="One more line?")
     assert _trace(last, "select_code_help")[0]["reason"].startswith("rule code.limit: 3 lines already given")
     assert "`seen[n] = i`" not in last[-1][1]["reply"]  # the same reply is now blocked and replaced
 
+    model.category = "ok"
     fresh = _send(client, sid, text="hi", problem="valid-parentheses")
     assert _trace(fresh, "select_code_help")[0]["reason"].startswith("rule code.not_yet")
 
@@ -412,3 +435,16 @@ def test_no_code_in_an_interview_however_often_they_ask(client: TestClient, mode
         assert checks and all(c["decision"] == "blocked" for c in checks)
         assert all(c["reason"].startswith("rule leak.code_line") for c in checks)
         assert "`seen[n] = i`" not in events[-1][1]["reply"]
+
+
+def test_ordinary_messages_count_as_tries_towards_a_line_of_code(client: TestClient, model: ScriptedModel) -> None:
+    """Talking the problem through is trying. The third message can ask for a line and get one."""
+    model.category = "ok"
+    sid = _new(client)
+    _send(client, sid, text="I think I need to remember numbers I have seen.")
+    _send(client, sid, text="Maybe keep them somewhere I can look up fast.")
+    model.category = "solution_request"
+    model.hints = [LINE]
+    events = _send(client, sid, text="Can you add one line for me? I can take it from there.")
+    assert _trace(events, "select_code_help")[0]["decision"] == "one_line"
+    assert "`seen[n] = i`" in events[-1][1]["reply"]
