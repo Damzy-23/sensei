@@ -251,7 +251,9 @@ def resolve_ticket_row(ticket_id: str) -> dict[str, Any] | None:
         "SELECT COUNT(*) AS n FROM tickets WHERE session_id = ? AND status = 'open'", (row["session_id"],)
     )
     if int(still_open[0]["n"]) == 0:
-        update_session(row["session_id"], escalated=False)
+        # The mentor has handled it: clear the escalated flag and the counts that triggered it,
+        # so the next message does not escalate again on the same violations.
+        update_session(row["session_id"], escalated=False, guard_violations=0, frustration_flags=0)
     return get_ticket_row(ticket_id)
 
 
