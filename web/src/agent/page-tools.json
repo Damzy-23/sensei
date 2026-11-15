@@ -157,5 +157,26 @@
         "description": "Words from a title, or a pattern name."
       }
     }
+  },
+  "propose_calendar_event": {
+    "description": "Offer the student a practice session to add to their Google Calendar. This puts a card on the glass with an add-to-calendar link; the student decides whether to click it. Nothing is added without them.",
+    "parameters": {
+      "title": {
+        "type": "string",
+        "description": "Event title, for example Practice: sliding window."
+      },
+      "start": {
+        "type": "string",
+        "description": "Local start time as YYYY-MM-DDTHH:MM, for example 2026-11-16T18:30."
+      },
+      "minutes": {
+        "type": "integer",
+        "description": "Length in minutes, 15 to 240."
+      },
+      "details": {
+        "type": "string",
+        "description": "One or two sentences on what to practise."
+      }
+    }
   }
 }
