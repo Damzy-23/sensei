@@ -12,15 +12,20 @@ import { Profile } from "./pages/Profile";
 import { Tracks } from "./pages/Tracks";
 import { Workspace } from "./pages/Workspace";
 
-const NAV: { id: PageId; label: string }[] = [
-  { id: "workspace", label: "Workspace" },
-  { id: "tracks", label: "Learn path" },
-  { id: "blitz", label: "Blitz lab" },
-  { id: "profile", label: "Profile" },
-  { id: "cv", label: "CV studio" },
-  { id: "inspector", label: "Agent inspector" },
-  { id: "mentor", label: "Mentor" },
-  { id: "logs", label: "Activity log" },
+// Two groups: what a student uses, and what shows how the agents work.
+const NAV: { group: string; items: { id: PageId; label: string }[] }[] = [
+  { group: "Practise", items: [
+    { id: "workspace", label: "Workspace" },
+    { id: "tracks", label: "Learn path" },
+    { id: "blitz", label: "Blitz lab" },
+    { id: "profile", label: "Profile" },
+    { id: "cv", label: "CV studio" },
+  ] },
+  { group: "Behind the scenes", items: [
+    { id: "inspector", label: "Agent inspector" },
+    { id: "mentor", label: "Mentor" },
+    { id: "logs", label: "Activity log" },
+  ] },
 ];
 
 function Logo() {
@@ -47,10 +52,15 @@ export function App() {
       <header className="topbar">
         <div className="brand"><Logo />Senior</div>
         <nav className="nav" aria-label="Screens">
-          {NAV.map((item) => (
-            <button key={item.id} className={page === item.id ? "on" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => go(item.id)}>
-              {item.label}
-            </button>
+          {NAV.map((section) => (
+            <div key={section.group} className="nav-group" role="group" aria-label={section.group}>
+              <span className="nav-group-label" aria-hidden="true">{section.group}</span>
+              {section.items.map((item) => (
+                <button key={item.id} className={page === item.id ? "on" : ""} aria-current={page === item.id ? "page" : undefined} onClick={() => go(item.id)}>
+                  {item.label}
+                </button>
+              ))}
+            </div>
           ))}
         </nav>
         <div className="topbar-actions">

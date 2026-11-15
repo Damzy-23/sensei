@@ -15,5 +15,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app/ app/
 COPY config/ config/
 COPY data/tracks/ data/tracks/
+COPY data/problems.json data/problems.json
 COPY --from=web /web/dist web/dist
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]

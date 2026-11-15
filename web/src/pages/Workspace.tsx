@@ -244,7 +244,7 @@ export function Workspace() {
         <div aria-label="Pattern mastery" style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
           {mastery.length === 0
             ? <span className="dim" style={{ fontSize: 12 }}>Mastery appears after your first passing run</span>
-            : mastery.map(([pattern, value]) => <span key={pattern} className="chip seafoam">{pattern} {Math.round(value * 100)}%</span>)}
+            : mastery.map(([pattern, value]) => <span key={pattern} className="chip seafoam">{patternName(pattern)} {Math.round(value * 100)}%</span>)}
         </div>
       </div>
 

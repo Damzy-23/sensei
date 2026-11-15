@@ -295,3 +295,16 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .site-footer { position: relative; z-index: 2; display: flex; flex-wrap: wrap; gap: 8px 20px; margin-top: 56px; padding-top: 20px; padding-bottom: 40px; border-top: 1px solid var(--line); font-size: 13px; color: var(--text-3); }
 .site-footer a, .signin-legal a { color: var(--sky); text-underline-offset: 3px; }
 .signin-legal { margin: 0; font-size: 12px; color: var(--text-3); }
+
+/* Navigation in two groups */
+.nav { align-items: center; gap: 6px 22px; }
+.nav-group { position: relative; display: flex; align-items: center; gap: 6px 16px; flex: none; }
+.nav-group + .nav-group { padding-left: 22px; border-left: 1px solid var(--line); }
+.nav-group-label { position: absolute; top: -13px; left: 0; font: 600 9px var(--body); letter-spacing: 1px; text-transform: uppercase; color: var(--text-3); white-space: nowrap; pointer-events: none; }
+.nav-group + .nav-group .nav-group-label { left: 22px; }
+.nav-group:last-child button.on, .nav-group:last-child button:hover { color: var(--baltic); }
+.nav-group:last-child button.on { border-bottom-color: var(--baltic); }
+@media (max-width: 760px) {
+  .nav-group-label { display: none; }
+  .nav-group + .nav-group { padding-left: 16px; }
+}
