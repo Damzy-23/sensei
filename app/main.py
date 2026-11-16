@@ -20,7 +20,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from app.api import eval as eval_routes
 from app.api.auth import current_viewer
-from app.api import cv, logs, mentor, problems, profile, sessions, traces, tracks, voice
+from app.api import cv, logs, mentor, problems, proctor, profile, sessions, traces, tracks, voice
 from app.memory import durable
 from app.memory.repository import MemoryUnavailable
 
@@ -88,7 +88,7 @@ app.add_middleware(
 
 # Every route is answered for a viewer (a guest or a signed-in user), so a token that
 # does not verify is refused everywhere. What a viewer may see is decided in the routes.
-for module in (sessions, problems, tracks, traces, mentor, voice, cv, profile, logs, eval_routes):
+for module in (sessions, problems, tracks, traces, mentor, voice, cv, profile, logs, proctor, eval_routes):
     app.include_router(module.router, dependencies=[Depends(current_viewer)])
 
 

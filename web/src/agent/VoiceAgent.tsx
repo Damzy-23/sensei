@@ -8,6 +8,7 @@ import { ApiError, startVoiceSession } from "../api";
 import { useAuth } from "../auth";
 import personas from "./personas.json";
 import { TOOL_NAMES, invoke, type ToolName, type ToolSignatures } from "./tools";
+import { voiceCall } from "./callState";
 
 type PersonaId = keyof typeof personas;
 const PERSONA_IDS = Object.keys(personas) as PersonaId[];
@@ -78,6 +79,7 @@ function Control() {
   };
 
   const live = status === "connected";
+  voiceCall.live = live;
   const label = live ? "Hang up" : starting || status === "connecting" ? "Connecting…" : "Call Senior";
   return (
     <div className="voice-bar">

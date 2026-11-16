@@ -5,6 +5,7 @@
 
 import { useEffect, useState } from "react";
 import { ApiError, getPanel, postDebrief, type Debrief, type Dimension, type DimensionScore, type PanelView } from "../api";
+import { Proctor } from "../proctor/Proctor";
 
 const DIMENSIONS: { id: Dimension; label: string }[] = [
   { id: "communication", label: "Communication" },
@@ -91,6 +92,8 @@ export function InterviewPanel({ sessionId, turns, busy }: { sessionId: string |
           </div>
         </div>
       </div>
+
+      <Proctor sessionId={sessionId} />
 
       {loadError && <div className="bubble notice" role="alert">The panel's notes could not be loaded: {loadError}</div>}
       {view && <Scorecard scores={(debrief ?? view).scores} />}

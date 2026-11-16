@@ -53,6 +53,7 @@ footer { margin-top:56px; padding-top:20px; padding-bottom:40px; border-top:1px 
   <li><strong>How the agents answered.</strong> A record of each step the AI agents take: which agent acted, which model or tool it used, tokens, cost, timing, the decision and its reason, and the first 500 characters of what went in and came out. This is the Activity log and the Agent inspector.</li>
   <li><strong>Optional features.</strong> Answers you give in the Profile interview, a job description and CV you paste into the CV studio, the name you type for a voice call, and the audio of a voice call while it is live.</li>
 </ul>
+<p><strong>The camera, only if you turn Proctor on.</strong> Proctor is an optional check in interview modes and is off until you switch it on. While it is on, your camera's video is analysed inside your browser to see whether you are facing the screen and whether both hands are in view. The video is never uploaded, recorded or stored, by us or by anyone else, and the camera stops as soon as you turn Proctor off, change mode or leave the Workspace. The only thing we keep is a line in the Activity log each time Proctor reminds you: which of the two reminders it was and how many seconds the condition had lasted. Turning Proctor on downloads the detection software and its models from jsDelivr and from Google's public file storage, which see that download like any other but receive no video, and the fixed words of a reminder are sent to ElevenLabs to be spoken.</p>
 
 <h2>How we use it</h2>
 <ul>
@@ -76,7 +77,7 @@ footer { margin-top:56px; padding-top:20px; padding-bottom:40px; border-top:1px 
   <li><strong>Google Firebase and Google Cloud:</strong> sign-in, hosting, the server and the stored activity log.</li>
   <li><strong>Anthropic (Claude):</strong> the AI models that read your messages and code and write the replies.</li>
   <li><strong>Linkup:</strong> web search for the Profile feature. It receives search queries built from your answers, not your account details.</li>
-  <li><strong>ElevenLabs:</strong> the voice coach, only when you start a call.</li>
+  <li><strong>ElevenLabs:</strong> the voice coach when you start a call, and the fixed words of a Proctor reminder when Proctor is on. Only those words are sent, never your camera.</li>
 </ul>
 
 <h2>How long we keep it</h2>
