@@ -544,18 +544,21 @@ def test_statements_anywhere_in_a_caption_are_code() -> None:
         assert not _leak.is_code(text), text
 
 
-def test_level_rules_block_more_than_the_hint_allows() -> None:
-    bars = {"kind": "bars", "values": ["1", "8", "6", "2"], "pointers": "0:left,3:right", "water": "0-3", "caption": ""}
-    assert _blocked_rule(bars, hint_level=1, pattern="two pointers") == "drawing.level"
-    assert _blocked_rule(bars, hint_level=4, pattern="two pointers") is None
+def test_level_rules_trim_what_the_hint_does_not_allow_yet() -> None:
+    def decided(raw, level):
+        return _drawing_guard.decide(raw, hint_level=level, pattern="two pointers")
+    ends = {"kind": "bars", "values": ["1", "8", "6", "2"], "pointers": "0:left,3:right", "water": "0-3", "caption": ""}
+    assert decided(ends, 1).rule == "drawing.ok"  # the starting state, at the two ends
+    inner = {"kind": "bars", "values": ["1", "8", "6", "2"], "pointers": "1:left,3:right", "water": "1-3", "caption": ""}
+    trimmed = decided(inner, 1)
+    assert trimmed.rule == "drawing.level_trimmed" and trimmed.drawing.pointers == "3:right" and trimmed.drawing.water == ""
+    assert decided(inner, 4).rule == "drawing.ok"
     plan = {"kind": "steps", "values": ["Start at both ends", "Move the shorter", "Keep the best"], "title": "Plan"}
-    assert _blocked_rule(plan, hint_level=2) == "drawing.level"
-    assert _blocked_rule(plan, hint_level=4) is None
+    assert decided(plan, 2).drawing.values == ["Start at both ends", "Move the shorter"]
+    assert decided(plan, 4).drawing.values == plan["values"]
     named = {"kind": "array", "values": ["2", "7", "11"], "caption": "A Hash Map makes this fast"}
     assert _blocked_rule(named, hint_level=1, pattern="hash map") == "drawing.level"
     assert _blocked_rule(named, hint_level=2, pattern="hash map") is None
-    plain = {"kind": "bars", "values": ["1", "8", "6"], "pointers": "0:i", "caption": "These are the walls."}
-    assert _blocked_rule(plain, hint_level=0, pattern="two pointers") is None
 
 
 def test_prose_only_drops_code_in_backticks_in_any_form() -> None:

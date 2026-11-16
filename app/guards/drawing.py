@@ -146,11 +146,29 @@ def decide(raw: Any, hint_level: int | None = None, pattern: str = "") -> Drawin
         words = [texts["title"], texts["caption"], *labels] + (cells if kind in ("steps", "array") else [])
         if hint_level < 2 and pattern and any(_mentions(t, pattern) for t in words):
             return _blocked("drawing.level", f"names the pattern ({pattern}) before hint level 2")
+        # Below level 4 the picture is trimmed rather than dropped, so the student still gets one:
+        # pointers and water stay only at the two ends (the starting state, not an answer), and a
+        # plan keeps its first two steps (restating the goal), not the way to solve it.
         if hint_level < 4:
+            trimmed = []
             if kind == "steps" and len(cells) > 2:
-                return _blocked("drawing.level", f"a plan of {len(cells)} steps before hint level 4 describes the approach")
-            if kind == "bars" and (texts["water"] or len(labels) > 1):
-                return _blocked("drawing.level", "two pointers or water on bars before hint level 4 show the answer's area")
+                cells = cells[:2]
+                trimmed.append("plan cut to two steps")
+            if kind == "bars":
+                ends = {0, len(cells) - 1}
+                pairs = [(int(p.split(":", 1)[0]), p.split(":", 1)[1].strip()) for p in texts["pointers"].split(",") if ":" in p]
+                kept = [(i, name) for i, name in pairs if i in ends]
+                if len(kept) != len(pairs):
+                    texts["pointers"] = ",".join(f"{i}:{name}" for i, name in kept)
+                    trimmed.append("pointers kept only at the ends")
+                if texts["water"] and {int(x) for x in texts["water"].split("-")} != ends:
+                    texts["water"] = ""
+                    trimmed.append("water removed")
+            if trimmed:
+                return DrawingDecision(
+                    Drawing(kind=kind, values=cells, **texts), "drawing.level_trimmed",
+                    f"hint level {hint_level}: " + ", ".join(trimmed),
+                )
 
     return DrawingDecision(
         Drawing(kind=kind, values=cells, **texts), "drawing.ok", f"{kind} with {len(cells)} {unit}, within the glass limits, no code"
