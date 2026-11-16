@@ -104,7 +104,7 @@ async def illustrate(sketch: Sketch) -> Drawing | None:
     with follow_up(sketch.trace):
         try:
             raw = await illustrator.draw(sketch.ctx, sketch.reply)
-            return None if raw is None else drawing_guard.check(raw)
+            return None if raw is None else drawing_guard.check(raw, sketch.ctx.hint_level, sketch.ctx.pattern)
         except Exception:  # noqa: BLE001 - the failing span has already recorded the error
             return None
 

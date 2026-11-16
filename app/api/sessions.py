@@ -88,7 +88,7 @@ async def _message_stream(session_id: str, body: MessageIn) -> AsyncIterator[str
         except orchestrator.TurnError as exc:
             yield sse("error", {"message": str(exc), "trace_id": exc.trace_id})
             return
-        yield sse("final", result.final)
+        yield sse("final", result.final.model_copy(update={"drawing_coming": result.sketch is not None}))
         if result.sketch is None:
             return
         tasks.append(asyncio.create_task(orchestrator.illustrate(result.sketch)))

@@ -86,9 +86,21 @@ def decide(reply: str, allowed_code_lines: int = 0) -> LeakDecision:
 # (but not O(n), nor a plural like "number(s)"), a subscript on a name.
 _CODE_IN_TEXT = re.compile(
     r"`"
-    r"|\b[A-Za-z_]\w*(\[[^\]]*\])?\s*(\+=|-=|\*=|==|!=|=)\s*\S"
+    r"|\b[A-Za-z_]\w*(\[[^\]]*\])?\s*(\+=|-=|\*=|/=|//=|%=|\*\*=|&=|\|=|\^=|>>=|<<=|:=|==|!=|=)\s*\S"
     r"|\b(?!O\()[A-Za-z_][\w.]*\((?!s\))"
     r"|\b[A-Za-z_]\w*\[[^\]]*\]"
+    r"|\+\+|--\s*[A-Za-z_]|[A-Za-z_]\w*\s*--"
+    # Statements written anywhere in the text, not only at the start of a line.
+    r"|\b(if|elif|while)\b[^:]{0,60}:\s*\S"
+    r"|\bfor\b[^:]{0,60}\bin\b[^:]{0,60}:"
+    r"|\b(else|try|finally)\s*:"
+    r"|:\s*(return|yield|break|continue|pass|raise)\b"
+    r"|\blambda\b[^:]{0,40}:"
+    r"|\bfrom\s+[\w.]+\s+import\b|\bimport\s+[\w.]+"
+    r"|\[[^\]]*\bfor\b[^\]]*\bin\b"
+    r"|\breturn\s+\S"
+    r"|\b(def|class)\s+[A-Za-z_]",
+    re.IGNORECASE,
 )
 
 
@@ -114,9 +126,19 @@ def prose_only(reply: str) -> str:
         if fence:
             # A block that opens and closes on one line gives its code there; any other fence line opens or closes one.
             in_fence = in_fence if given else not in_fence
-        elif not (in_fence or given or prose_like):
-            kept.append(raw)
+            continue
+        if in_fence or given or prose_like:
+            continue
+        # Code in backticks inside a sentence, or with a full stop or a note after it, is taken out too.
+        line = _BACKTICKED.sub(lambda m: "" if is_code(m.group(1)) or len(m.group(1)) > 24 else m.group(0), raw)
+        if _BARE.fullmatch(line):
+            continue
+        kept.append(line)
     return "\n".join(kept).strip()
+
+
+_BACKTICKED = re.compile(r"`([^`]+)`")
+_BARE = re.compile(r"[\s.,;:!?()\-*>]*")
 
 
 def check(reply: str, allowed_code_lines: int = 0) -> LeakDecision:

@@ -86,6 +86,7 @@ def stub_final(session_id: str) -> FinalEvent:
         hint_level=1,
         escalated=False,
         trace_id=STUB_TRACE_ID,
+        drawing_coming=True,  # the stub stream always follows its reply with a picture
     )
 
 

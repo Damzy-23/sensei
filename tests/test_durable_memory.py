@@ -144,6 +144,8 @@ class ScriptedModel:
         if "Classify the" in system:
             text = json.dumps({"category": self.category, "confidence": 0.9, "reason": "they say they are stuck"})
             return LLMResult(text, model, 100, 20)
+        if "illustrator" in system:  # the illustrator: no picture, and no hint used up
+            return LLMResult('{"kind": "none"}', model, 50, 5)
         return LLMResult(self.hints.pop(0) if len(self.hints) > 1 else self.hints[0], model, 400, 60)
 
 
@@ -222,9 +224,10 @@ def _send(client: TestClient, session_id: str, text: str = "I'm stuck") -> dict:
     """One student message. The reply must be a normal one: 200, ending in a `final` event."""
     r = client.post(f"/sessions/{session_id}/message", json={"text": text, "problem_id": "two-sum", "code": "pass"})
     assert r.status_code == 200, r.text
-    name, final = _events(r.text)[-1]
-    assert name == "final", final
-    return final
+    # A picture may follow the reply on the same stream; the reply is the `final` event.
+    finals = [data for name, data in _events(r.text) if name == "final"]
+    assert len(finals) == 1, r.text[-400:]
+    return finals[0]
 
 
 def _new(client: TestClient) -> str:
@@ -444,8 +447,8 @@ def test_a_student_carries_on_after_a_restart_where_they_left_off(firestore, res
     after = memory.transcript(sid)
     assert after[:4] == thread and [m.actor for m in after] == ["student", "coach"] * 3
     # The coach was shown the conversation from before the restart.
-    assert "student: I'm stuck\ncoach: What repeats as you scan the list?" in model.calls[-1][1]
-    assert "coach: What could you keep beside each number?" in model.calls[-1][1]
+    assert "student: I'm stuck\ncoach: What repeats as you scan the list?" in [c for c in model.calls if "STUDENT-" not in c[1]][-1][1]
+    assert "coach: What could you keep beside each number?" in [c for c in model.calls if "STUDENT-" not in c[1]][-1][1]
 
     restart()  # what was written after the first restart was mirrored too
     assert _send(client, sid)["hint_level"] == 4

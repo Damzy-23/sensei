@@ -73,9 +73,11 @@ export function registerTool<N extends ToolName>(name: N, handler: ToolHandler<N
 }
 
 /** Call a tool. Never throws: a failure comes back as `{ ok: false, error }` for the agent to read. */
-export async function invoke<N extends ToolName>(name: N, args: ToolSignatures[N][0]): Promise<ToolResult<N>> {
+export async function invoke<N extends ToolName>(name: N, args: ToolSignatures[N][0], options: { quiet?: boolean } = {}): Promise<ToolResult<N>> {
   const started = performance.now();
   const result = await run(name, args);
+  // quiet: the app acting for itself (a picture that comes with a typed reply), not the agent. Not shown in the feed.
+  if (options.quiet) return result;
   const call: ToolCall = {
     id: callCount++, name, args, ok: result.ok, error: result.ok ? null : result.error,
     ms: Math.round(performance.now() - started), at: Date.now(),

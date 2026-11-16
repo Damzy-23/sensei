@@ -139,6 +139,8 @@ class FinalEvent(BaseModel):
     hint_level: int = Field(ge=0, le=5)
     escalated: bool
     trace_id: str
+    # True when a picture for this reply is being drawn and may follow as a `drawing` event.
+    drawing_coming: bool = False
 
 
 class Drawing(BaseModel):

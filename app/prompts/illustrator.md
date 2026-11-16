@@ -36,14 +36,15 @@ concrete to show), draw nothing.
 Kinds, and what `values` holds for each:
 - `array`: a row of cells, at most 16. `pointers` labels cells by index, like "0:left,4:right".
 - `bars`: numbers as bars, at most 16, for heights and amounts. `pointers` as for array;
-  `water` fills between two indices, like "1-8"; `highlight` lights indices, like "2,3".
-  The glass works out the area between two pointers on bars and shows it, so give bars two
-  pointers only when the reply is about the space between two bars.
+  `water` fills between two indices, like "2-5"; `highlight` lights indices, like "2,3".
+  The glass works out the area between two pointers on bars and shows it, and water does the
+  same. So below hint level 4 give bars at most one pointer and no water: draw the input only.
 - `grid`: one string per row, like "1,1,0", at most 8 rows of 12 cells. `highlight` takes
   row:column pairs, like "0:1,1:1".
 - `tree`: a binary tree in level order, at most 31 values, "null" for a gap. `highlight` as for bars.
 - `graph`: one short label per node, at most 31. `edges` joins nodes by index, like "0-1,1-2".
-- `steps`: two to six short steps in words, with a short `title`.
+- `steps`: two to six short steps in words, with a short `title`. Below hint level 4, at most
+  two steps, and only to restate the goal or what the student said, never a plan to solve it.
 
 Every value is a string of at most 16 characters (a step may be a short sentence). Pointer
 labels are one or two words. `caption` is one short sentence, at most 160 characters, in

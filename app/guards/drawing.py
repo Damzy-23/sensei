@@ -33,7 +33,7 @@ _FORMATS = {
     "highlight": re.compile(r"\s*\d+(\s*:\s*\d+)?\s*(,\s*\d+(\s*:\s*\d+)?\s*)*"),
     "edges": re.compile(r"\s*\d+\s*-\s*\d+\s*(,\s*\d+\s*-\s*\d+\s*)*"),
 }
-_EXAMPLES = {"pointers": "0:left,4:right", "water": "1-8", "highlight": "2,3 or 0:1", "edges": "0-1,1-2"}
+_EXAMPLES = {"pointers": "0:left,4:right", "water": "2-5", "highlight": "2,3 or 0:1", "edges": "0-1,1-2"}
 _GRID_SPLIT = re.compile(r"[\s,]+")
 
 
@@ -60,8 +60,22 @@ def _is_number(text: str) -> bool:
     return True
 
 
-def decide(raw: Any) -> DrawingDecision:
-    """The rules themselves, without a trace span. `check` wraps them for a drawing on its way out."""
+def _mentions(text: str, pattern: str) -> bool:
+    """True when the text names the pattern (case and plural insensitive), for example "hash map" or "two pointers"."""
+    words = [w for w in re.split(r"[\s_-]+", pattern.lower()) if w]
+    if not words:
+        return False
+    body = r"[\s_-]*".join(re.escape(w.rstrip("s")) + "s?" for w in words)
+    return re.search(rf"\b{body}\b", text.lower()) is not None
+
+
+def decide(raw: Any, hint_level: int | None = None, pattern: str = "") -> DrawingDecision:  # noqa: C901
+    """The rules themselves, without a trace span. `check` wraps them for a drawing on its way out.
+
+    With a hint level, a drawing may not show more than that rung of the ladder allows
+    (app/prompts/hint_coach.md): below 2 it may not name the pattern; below 4 it shows the
+    input only, so no two pointers, no water and no plan of more than two steps.
+    """
     if not isinstance(raw, dict):
         return _blocked("drawing.shape", "the drawing is not a JSON object")
     kind = raw.get("kind")
@@ -106,30 +120,48 @@ def decide(raw: Any) -> DrawingDecision:
     if kind == "bars" and not all(_is_number(cell) for cell in cells):
         return _blocked("drawing.shape", "bars are heights: every value must be a number")
 
-    for name, pattern in _FORMATS.items():
-        if texts[name] and not pattern.fullmatch(texts[name]):
+    for name, form in _FORMATS.items():
+        if texts[name] and not form.fullmatch(texts[name]):
             return _blocked("drawing.format", f"{name} must look like {_EXAMPLES[name]}")
     labels = [part.split(":", 1)[1].strip() for part in texts["pointers"].split(",") if ":" in part]
     if any(len(label) > MAX_LABEL for label in labels):
         return _blocked("drawing.size", f"a pointer label takes at most {MAX_LABEL} characters")
+    if len(labels) > max(2, len(cells)):
+        return _blocked("drawing.size", f"at most {max(2, len(cells))} pointer labels on {len(cells)} {unit}")
 
     # The glass shows words and pictures. Code on it would walk around the coach's leak check.
-    for where, text in [("values", c) for c in cells] + [("pointers", p) for p in labels] + [
+    # Each piece is checked, and so are the pieces read together, so a line of code cannot be
+    # split across cells or pointer labels.
+    joined = [] if kind in ("steps", "grid") else [
+        ("values", " ".join(cells)), ("values", "".join(cells)), ("pointers", " ".join(labels)), ("pointers", "".join(labels)),
+    ]
+    for where, text in [("values", c) for c in cells] + [("pointers", p) for p in labels] + joined + [
         ("title", texts["title"]), ("caption", texts["caption"]),
     ]:
         if leak.is_code(text):
             return _blocked("drawing.code", f"code in the {where}")
+
+    # Not more than the hint level allows (mirrors the ladder in app/prompts/hint_coach.md).
+    if hint_level is not None:
+        words = [texts["title"], texts["caption"], *labels] + (cells if kind in ("steps", "array") else [])
+        if hint_level < 2 and pattern and any(_mentions(t, pattern) for t in words):
+            return _blocked("drawing.level", f"names the pattern ({pattern}) before hint level 2")
+        if hint_level < 4:
+            if kind == "steps" and len(cells) > 2:
+                return _blocked("drawing.level", f"a plan of {len(cells)} steps before hint level 4 describes the approach")
+            if kind == "bars" and (texts["water"] or len(labels) > 1):
+                return _blocked("drawing.level", "two pointers or water on bars before hint level 4 show the answer's area")
 
     return DrawingDecision(
         Drawing(kind=kind, values=cells, **texts), "drawing.ok", f"{kind} with {len(cells)} {unit}, within the glass limits, no code"
     )
 
 
-def check(raw: Any) -> Drawing | None:
+def check(raw: Any, hint_level: int | None = None, pattern: str = "") -> Drawing | None:
     """Return the drawing if it may go on the glass. A blocked one is on the trace with its rule."""
     shown = json.dumps(raw, ensure_ascii=False, default=str) if isinstance(raw, (dict, list)) else str(raw)
     with span("guard", "guard.output", "drawing_check", shown) as st:
-        decision = decide(raw)
+        decision = decide(raw, hint_level, pattern)
         blocked = decision.drawing is None
         st.decision = "blocked" if blocked else "pass"
         st.reason = decision.reason

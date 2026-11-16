@@ -17,7 +17,7 @@ export interface TraceEvent {
   latency_ms: number | null; model: string | null; tokens_in: number | null; tokens_out: number | null;
   cost_usd: number | null; input: string | null; output: string | null; decision: string | null; reason: string | null;
 }
-export interface FinalEvent { reply: string; mode: Mode; hint_level: number; escalated: boolean; trace_id: string }
+export interface FinalEvent { reply: string; mode: Mode; hint_level: number; escalated: boolean; trace_id: string; drawing_coming?: boolean }
 export type DrawingKind = "bars" | "grid" | "tree" | "graph" | "array" | "steps";
 /** One picture for the glass, sent after the reply when it has one. Mirrors Drawing in app/models.py:
  *  the text fields are in the formats the glass tools take (pointers "0:left,4:right", water "1-8",
