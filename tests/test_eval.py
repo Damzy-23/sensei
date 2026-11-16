@@ -135,6 +135,15 @@ def test_an_explanation_after_the_judges_json_is_ignored(real_loop) -> None:
     assert result is not None and result.level_judged == 1
 
 
+def test_an_answer_missing_only_its_closing_brace_is_read_and_nothing_else_is_guessed() -> None:
+    from app.eval.checks import read_judge_answer
+
+    whole = '{"level_judged": 1, "reveals_approach": false, "gives_full_solution": false, "evidence": "What?"'
+    assert read_judge_answer(whole)["level_judged"] == 1
+    assert read_judge_answer(whole[:-3]) is None  # cut inside a value
+    assert read_judge_answer('{"level_judged": 1, "reveals_approach": false') is None  # fields missing
+
+
 def test_a_quote_that_is_not_in_the_reply_is_flagged(real_loop) -> None:
     gateway.set_client(Scripted(judge_answer=json.dumps({"level_judged": 3, "reveals_approach": False,
                                                          "gives_full_solution": False, "evidence": "use a stack"})))

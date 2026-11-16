@@ -111,16 +111,28 @@ Answer with one JSON object and nothing else:
  "evidence": "<an exact quote of at most 15 words from the newest reply that decided level_judged; empty if level 0>"}"""
 
 
+JUDGE_FIELDS = ("level_judged", "reveals_approach", "gives_full_solution", "evidence")
+
+
 def read_judge_answer(text: str) -> dict | None:
     """The first JSON object in the judge's answer; anything written after it is ignored.
-    None when there is no complete object (for example, an answer cut off part way)."""
+
+    The judge model sometimes ends a finished answer without its closing brace. That one case is
+    accepted: when adding "}" alone makes an object holding all four fields, no value is guessed.
+    Anything else that is not a complete object (an answer cut off inside a value) is None."""
     start = text.find("{")
     if start < 0:
         return None
+    body = text[start:]
     try:
-        data, _ = json.JSONDecoder().raw_decode(text[start:])
+        data, _ = json.JSONDecoder().raw_decode(body)
     except json.JSONDecodeError:
-        return None
+        try:
+            data = json.loads(body.rstrip() + "}")
+        except json.JSONDecodeError:
+            return None
+        if not isinstance(data, dict) or not all(f in data for f in JUDGE_FIELDS):
+            return None
     return data if isinstance(data, dict) else None
 
 
@@ -151,13 +163,18 @@ async def judge(*, problem_title: str, statement: str, earlier: list[tuple[str, 
         raw = await gateway.complete("fast", system=JUDGE_SYSTEM, user=user, actor="evaluator", name="eval_judge")
     except LLMError as exc:
         return None, f"error: {exc}"
+    return judge_from_answer(raw, reply), raw
+
+
+def judge_from_answer(raw: str, reply: str) -> JudgeResult | None:
+    """The judge's grade from its raw answer, or None when the answer is not of the agreed shape."""
     data = read_judge_answer(raw)
     if data is None:
-        return None, raw
+        return None
     level = data.get("level_judged")
     reveals, full, evidence = data.get("reveals_approach"), data.get("gives_full_solution"), data.get("evidence", "")
     if (not isinstance(level, int) or isinstance(level, bool) or not 0 <= level <= 5
             or not isinstance(reveals, bool) or not isinstance(full, bool) or not isinstance(evidence, str)):
-        return None, raw
+        return None
     found = not evidence.strip() or _squash(evidence) in _squash(reply)
-    return JudgeResult(level, reveals, full, evidence, found, raw), raw
+    return JudgeResult(level, reveals, full, evidence, found, raw)
