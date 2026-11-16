@@ -27,7 +27,7 @@ Run: `uvicorn app.main:app --reload --port 8000`
 | `mode` | `learn`, `interview`, `blitz`, `call` |
 | `hint_level` | integer `0`–`5` (0 = no hint yet) |
 | `next_action` | `keep_coding`, `ask_for_hint`, `review_complexity`, `escalate` |
-| `actor` (trace) | `client`, `guard`, `orchestrator`, `interviewer`, `hint_coach`, `evaluator`, `planner`, `mentor`, `escalation` |
+| `actor` (trace) | `client`, `guard`, `orchestrator`, `interviewer`, `hint_coach`, `evaluator`, `planner`, `mentor`, `escalation`, `proctor` |
 | `type` (trace) | `turn.start`, `guard.input`, `mode.decision`, `agent.start`, `llm.call`, `tool.call`, `tool.result`, `guard.output`, `escalation.created`, `mentor.message`, `turn.end`, `eval.run`, `eval.pair` |
 | `status` (trace) | `ok`, `blocked`, `error`, `retried` |
 | chat `actor` | `student`, `coach`, `mentor` |
@@ -264,6 +264,24 @@ computed ones.
 ```
 `409` when there are no notes yet. `502 {"detail": {"message", "trace_id"}}` when the model
 fails or the feedback contained code and was withheld.
+
+### `POST /sessions/{session_id}/proctor-events` → 201 | 404 | 409 | 413 | 422 | 429
+Proctor is an optional camera check in `interview`, `blitz` and `call` modes. The camera is
+analysed in the browser; this route only records that a reminder was given, so it shows in the
+Agent inspector and the Activity log. Works the same with stubs on or off.
+```json
+{ "rule": "eyes_off_screen", "seconds": 3.4 }
+```
+- `rule`: `eyes_off_screen` or `hands_not_visible`. `seconds`: how long the condition had held, above 0 and at most 3600.
+- **Nothing else is accepted.** Unknown fields, strings for numbers and bodies over 256 bytes are
+  refused (`422`, `413`): there is no field for an image or free text.
+- `409` for a `learn` session. `429` after 12 reminders in a minute for one session.
+
+Response, and the trace event it writes (`actor` `proctor`, `type` `guard.input`, `name`
+`eyes_check` or `hands_check`, `output` the words spoken):
+```json
+{ "trace_id": "trc_...", "decision": "reminded: eyes", "reason": "no face facing the screen for 3.4 s" }
+```
 
 ---
 
