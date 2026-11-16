@@ -101,6 +101,14 @@ def test_one_allowed_line_passes_and_two_fail() -> None:
     assert _checks(one, allowed=0).failed == ["too_much_code"]  # a line that was not allowed
 
 
+def test_telling_the_student_their_hint_level_fails() -> None:
+    for reply in ("At level 1 I will not name the structure yet. What is the goal?",
+                  "I can't lay out the full algorithm at this level. What have you tried?",
+                  "Hint level 2: think about the area."):
+        assert _checks(reply).failed == ["mentions_hint_level"], reply
+    assert _checks("What level of detail does the problem ask for?").failed == []
+
+
 def test_whole_words_only() -> None:
     assert _checks("Think about the dictionary.", level=1).area_terms_too_early == ["dictionary"]
     assert _checks("This predicts nothing.", level=1).failed == []  # "dict" inside a longer word

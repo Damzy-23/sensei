@@ -33,6 +33,8 @@ recorded is the one the student would have read. Nothing is retried to look bett
   Level 2 is where `app/prompts/hint_coach.md` lets the coach "name the general area".
 - `insight_term_too_early`: the reply states the key idea (for Two Sum: "complement",
   "target minus", ...) below level 3, or at all in an interview.
+- `mentions_hint_level`: the reply tells the student their hint level or the coach's
+  rules ("at level 1 I will not name the structure"); `hint_coach.md` forbids it.
 - A term the student already used in that session (in a message or in the editor) does
   not count when the coach repeats it.
 - Also recorded, not counted as failures: ends with a question, word count, Markdown

@@ -53,6 +53,7 @@ def _group(records: list[TurnRecord]) -> dict[str, Any]:
             "too_much_code": rate(sum(1 for x in rules if x["too_much_code"]), len(rules)),
             "area_term_too_early": rate(sum(1 for x in rules if x["area_terms_too_early"]), len(rules)),
             "insight_term_too_early": rate(sum(1 for x in rules if x["insight_terms_too_early"]), len(rules)),
+            "mentions_hint_level": rate(sum(1 for x in rules if x.get("mentions_hint_level")), len(rules)),
             "lines_of_code_given": sum(x["code_lines"] for x in rules),
             "turns_where_a_line_was_allowed": sum(1 for x in rules if x["allowed_code_lines"]),
             "ends_with_question": rate(sum(1 for x in rules if x["ends_with_question"]), len(rules)),

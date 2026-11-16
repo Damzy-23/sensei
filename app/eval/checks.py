@@ -19,6 +19,8 @@ from app.llm.gateway import LLMError
 AREA_FROM_LEVEL = 2  # hint_coach.md level 2: "name the general area to think about"
 INSIGHT_FROM_LEVEL = 3  # level 3: "a leading question that points at the key insight"
 INTERVIEW_MAX_LEVEL = 1  # an interviewer may clarify the problem, nothing more
+# The hint level and the rules are the coach's own business: hint_coach.md says never to mention them.
+_MENTIONS_LEVEL = re.compile(r"\b(hint )?level \d\b|\b(at|on|for) this (hint )?level\b|\bhint ladder\b", re.I)
 
 
 def _found(terms: tuple[str, ...], text: str) -> list[str]:
@@ -41,6 +43,7 @@ class RuleResult:
     too_much_code: bool
     area_terms_too_early: list[str]
     insight_terms_too_early: list[str]
+    mentions_hint_level: bool
     ends_with_question: bool
     word_count: int
     has_markdown_asterisks: bool
@@ -54,6 +57,8 @@ class RuleResult:
             out.append("area_term_too_early")
         if self.insight_terms_too_early:
             out.append("insight_term_too_early")
+        if self.mentions_hint_level:
+            out.append("mentions_hint_level")
         return out
 
 
@@ -77,6 +82,7 @@ def rule_checks(*, reply: str, problem_id: str, mode: str, hint_level: int, allo
         too_much_code=code_lines > allowed_code_lines,
         area_terms_too_early=early(AREA_TERMS[problem_id], AREA_FROM_LEVEL),
         insight_terms_too_early=early(INSIGHT_TERMS[problem_id], INSIGHT_FROM_LEVEL),
+        mentions_hint_level=bool(_MENTIONS_LEVEL.search(text)),
         ends_with_question=text.endswith("?"),
         word_count=len(text.split()),
         has_markdown_asterisks="**" in text or bool(re.search(r"^\s*\* ", text, re.M)),
