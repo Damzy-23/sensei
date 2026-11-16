@@ -39,6 +39,9 @@ def tools() -> list[dict]:
             "description": tool["description"],
             "expects_response": True,
             "response_timeout_secs": 60 if name == "ask_coach" else 20,
+            # No spoken filler before an action ("let me take a look"): the student asked for less talk.
+            "pre_tool_speech": "off",
+            "force_pre_tool_speech": False,
             "parameters": {"type": "object", "properties": properties, "required": list(properties)},
         })
     return out
@@ -59,6 +62,9 @@ def main() -> int:
             "overrides": {"conversation_config_override": {"tts": {"voice_id": True}}},
         },
         "conversation_config": {
+            # Wait for the student: 30 s of silence before the coach may speak again (the default is 7),
+            # and be patient about deciding they have finished a sentence.
+            "turn": {"turn_timeout": 30.0, "turn_eagerness": "patient"},
             "agent": {
                 "first_message": "{{first_line}}",
                 "dynamic_variables": {"dynamic_variable_placeholders": {
