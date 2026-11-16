@@ -121,7 +121,7 @@ export function InterviewPanel({ sessionId, turns, busy }: { sessionId: string |
         </div>
       ) : (
         <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-          <button type="button" className="btn-ghost" style={{ height: 36 }} disabled={!sessionId || busy || writing || notes.length === 0} onClick={() => void finish()}>
+          <button type="button" className="btn-ghost" style={{ height: 36 }} data-agent="confirm" disabled={!sessionId || busy || writing || notes.length === 0} onClick={() => void finish()}>
             {writing ? "Writing your feedback…" : "End interview and get feedback"}
           </button>
           {notes.length === 0 && <span className="dim" style={{ fontSize: 12 }}>Answer a question first: the observer has nothing to score yet.</span>}

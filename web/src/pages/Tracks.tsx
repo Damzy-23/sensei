@@ -56,7 +56,7 @@ export function Tracks() {
   }, [track, query]);
 
   return (
-    <main className="page">
+    <main className="page" aria-label="Learn path">
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "flex-end", gap: "12px 24px" }}>
         <div>
           <div className="label">Your map</div>

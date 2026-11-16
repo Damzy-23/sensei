@@ -522,3 +522,16 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .proctor-banner { padding: 10px 12px; border-radius: 12px; background: rgba(107, 159, 224, 0.12); border: 1px solid rgba(107, 159, 224, 0.45); font: 500 14px/20px var(--body); animation: fade 0.35s var(--ease) both; }
 .proctor-copy { margin: 0; font-size: 12px; line-height: 18px; color: var(--text-3); }
 .proctor-copy.problem { padding: 10px 12px; border-radius: 12px; background: rgba(134, 187, 216, 0.1); border: 1px solid rgba(134, 187, 216, 0.45); color: #d3e8f4; }
+
+/* Senior asks before an action that is the student's to take (agent/AgentControls.tsx). Glass, like the activity line. */
+.agent-ask { position: fixed; left: 0; right: 0; bottom: 24px; z-index: 50; margin: 0 auto; width: min(440px, calc(100vw - 32px)); box-sizing: border-box; display: flex; flex-direction: column; gap: 12px; padding: 16px; border-radius: 18px; background: rgba(21, 35, 45, 0.9); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border: 1px solid rgba(107, 159, 224, 0.55); box-shadow: 0 24px 60px -20px rgba(0, 0, 0, 0.75); animation: fade 0.3s var(--ease) both; }
+.agent-ask.top { bottom: auto; }
+.agent-ask:focus { outline: none; }
+.agent-ask-what { font: 500 15px/22px var(--body); color: var(--text); overflow-wrap: anywhere; }
+.agent-ask-what b { font-weight: 600; }
+.agent-ask-row { display: flex; flex-wrap: wrap; gap: 10px; }
+.agent-ask-row button { flex: 1 1 120px; min-height: 44px; }
+.agent-ask-clock { height: 3px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.agent-ask-clock span { display: block; height: 100%; background: var(--sky); transform-origin: left; animation: agent-ask-clock 20s linear forwards; }
+.agent-ask-note { font-size: 12px; line-height: 16px; }
+@keyframes agent-ask-clock { from { transform: scaleX(1); } to { transform: scaleX(0); } }

@@ -311,7 +311,7 @@ export function Workspace() {
   const mastery = Object.entries(session?.mastery ?? {});
 
   return (
-    <main className="page">
+    <main className="page" aria-label="Workspace">
       <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: "12px 20px" }}>
         <div role="group" aria-label="Mode" style={{ display: "flex", gap: 8 }}>
           {MODES.map((m) => (
@@ -423,7 +423,7 @@ export function Workspace() {
             </ol>
           )}
 
-          <div aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 240, maxHeight: 460, overflowY: "auto" }}>
+          <div role="log" aria-label="Conversation" aria-live="polite" style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 240, maxHeight: 460, overflowY: "auto" }}>
             {bubbles.length === 0 && (
               <div className="chat-empty">
                 <p className="muted">

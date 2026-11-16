@@ -249,7 +249,7 @@ export function Inspector() {
                 ))}
                 <span className="mono dim" style={{ marginLeft: "auto", fontSize: 12 }}>{visibleRows.length} events</span>
               </div>
-              <div style={{ overflowX: "auto" }}>
+              <div role="region" aria-label="Timeline rows, scroll sideways for more" style={{ overflowX: "auto" }}>
                 <div style={{ minWidth: 560 }}>
                   <div className="label" style={{ display: "grid", gridTemplateColumns: "128px minmax(150px, 1.1fr) minmax(160px, 2fr) 72px", gap: 12, padding: "10px 16px 6px 19px", fontSize: 10 }}>
                     <span>Actor</span>

@@ -53,7 +53,7 @@ guardrails, memory), and the layering between them is enforced by tests.
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): the design, a diagram of one turn, requirements, and what is built.
 - [docs/API.md](docs/API.md): the HTTP contract.
-- [docs/adr/](docs/adr/): three decisions and why we made them.
+- [docs/adr/](docs/adr/): four decisions and why we made them.
 
 ## Run it
 
@@ -62,6 +62,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env          # add ANTHROPIC_API_KEY, set SENSEI_USE_STUBS=0
 .venv/bin/uvicorn app.main:app --reload --port 8000
 .venv/bin/python -m pytest -q
+(cd web && npm ci && npm test)   # the control layer's rules (web/tests/)
 ```
 
 With `SENSEI_USE_STUBS=1` (the default) the API serves fixed sample data and needs no key.
@@ -93,6 +94,14 @@ narrated explainer, and offer a practice session for the calendar. The only code
 write into the editor is a line the coach has offered, one at a time, and
 the glass refuses anything that looks like code. Not yet tested with a
 real speaker.
+
+Built and tested in the browser, not yet on the live voice agent: six more tools, the control
+layer, with which the coach can operate any control the student can, by its name on screen
+(see, press, type, pick, read, scroll). Typing into the code editor, passwords and the sign-in
+form are blocked; signing out, resolving or replying to a mentor ticket, wiping or removing,
+and links that leave the app ask the student on screen first. See
+[ADR 0004](docs/adr/0004-agent-can-operate-every-control.md). The voice agent gets them when
+`scripts/create_voice_agent.py` is next run.
 
 Not built yet: phone calls (needs a phone number on the voice provider); the planner agent;
 the tuned-versus-base hint model evaluation (`/eval/results` returns placeholder data);

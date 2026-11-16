@@ -459,11 +459,11 @@ export function Glass() {
         {shown && !onCode && (
           <div className="gb-ctl">
             {mark && <button className="gb-btn" onClick={() => setLayer("code")}>Show the marked code</button>}
-            <button className="gb-btn" onClick={wipe}>Wipe</button>
+            <button className="gb-btn" data-agent="confirm" onClick={wipe}>Wipe</button>
             <button className="gb-btn" onClick={() => setUp(false)}>Lower</button>
           </div>
         )}
-        <div className={`gb-board ${wiping ? "wiping" : ""} ${onCode ? "away" : ""}`}>
+        <div className={`gb-board ${wiping ? "wiping" : ""} ${onCode ? "away" : ""}`} role="region" aria-label="Drawings on the glass">
           <div className="gb-flow">
             {items.map((item, i) => {
               const small = i < items.length - 1 && item.id !== openId;

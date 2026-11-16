@@ -110,6 +110,7 @@ function Control() {
         </>
       )}
       <button className={live ? "btn-ghost" : "btn-primary"} style={{ height: 36 }} disabled={starting || status === "connecting"}
+        data-agent={live ? undefined : "confirm"}
         onClick={() => (live ? void endSession() : void start())}>
         <span style={{ display: "inline-flex", alignItems: "center", gap: 8 }}><PhoneIcon hangUp={live} />{label}</span>
       </button>

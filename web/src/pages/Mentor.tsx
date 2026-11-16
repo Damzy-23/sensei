@@ -206,7 +206,7 @@ export function Mentor() {
                 {detail.transcript.length === 0 ? (
                   <div className="muted">No messages in this session.</div>
                 ) : (
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto", padding: 2 }}>
+                  <div role="log" aria-label="Transcript" style={{ display: "flex", flexDirection: "column", gap: 8, maxHeight: 360, overflowY: "auto", padding: 2 }}>
                     {detail.transcript.map((message) => (
                       <div key={message.id} className={`bubble ${message.actor}`}>
                         <div className="label" style={{ fontSize: 10, marginBottom: 2 }}>{message.actor}</div>
@@ -230,10 +230,10 @@ export function Mentor() {
                 />
                 {actionError && <div className="bubble notice" role="alert">{actionError}</div>}
                 <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                  <button className="btn-primary" onClick={() => void sendReply()} disabled={busy || !reply.trim()}>
+                  <button className="btn-primary" data-agent="confirm" onClick={() => void sendReply()} disabled={busy || !reply.trim()}>
                     {busy ? "Working…" : "Send reply"}
                   </button>
-                  <button className="btn-ghost" onClick={() => void resolve()} disabled={busy || detail.status === "resolved"}>
+                  <button className="btn-ghost" data-agent="confirm" onClick={() => void resolve()} disabled={busy || detail.status === "resolved"}>
                     {detail.status === "resolved" ? "Resolved" : "Resolve"}
                   </button>
                 </div>

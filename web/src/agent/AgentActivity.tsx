@@ -30,7 +30,23 @@ const PLAIN: Record<ToolName, string> = {
   play_explainer: "Played an explainer",
   propose_calendar_event: "Offered a practice slot",
   write_line: "Wrote a line into your code",
+  see_screen: "Looked at what is on your screen",
+  press: "Pressed",
+  type_into: "Typed into",
+  pick_option: "Picked",
+  read_screen: "Read your screen",
+  scroll_to: "Scrolled to",
 };
+
+/** For the control tools, which control: "Pressed Run tests". The words are the agent's own, shown as text. */
+function detail(call: ToolCall): string {
+  const args = (call.args ?? {}) as Record<string, unknown>;
+  const said = (key: string) => (typeof args[key] === "string" ? (args[key] as string).replace(/\s+/g, " ").trim().slice(0, 60) : "");
+  if (call.name === "press" || call.name === "type_into" || call.name === "scroll_to") return said("control");
+  if (call.name === "pick_option") return said("option") && said("control") ? `${said("option")} in ${said("control")}` : said("control");
+  if (call.name === "read_screen") return said("part");
+  return "";
+}
 
 const OFF_KEY = "senior.activity.off";
 
@@ -60,14 +76,14 @@ export function AgentActivity() {
   }
   if (!latest) return null;
   return (
-    <aside className="agent-activity" aria-label="What Senior is doing" aria-live="polite">
+    <aside className="agent-activity" aria-label="What Senior is doing" aria-live="polite" data-agent="off">
       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
         <span className="label">Senior is doing</span>
-        <button className="btn-ghost" style={{ height: 28, marginLeft: "auto", padding: "0 10px" }} onClick={() => turnOff(true)}>Always hide</button>
+        <button className="btn-ghost" style={{ height: 28, marginLeft: "auto", padding: "0 10px" }} data-agent="off" onClick={() => turnOff(true)}>Always hide</button>
       </div>
       <div className="mono" style={{ fontSize: 12, lineHeight: "18px" }}>
         <span className={latest.ok ? "seafoam" : "sky"}>{latest.ok ? "done" : "failed"}</span>{" "}
-        <span title={`tool: ${latest.name}`}>{PLAIN[latest.name] ?? latest.name}</span> <span className="dim">{latest.ms} ms</span>
+        <span title={`tool: ${latest.name}`}>{PLAIN[latest.name] ?? latest.name}{detail(latest) && <> {detail(latest)}</>}</span> <span className="dim">{latest.ms} ms</span>
         {latest.error && <div className="sky">{latest.error}</div>}
       </div>
     </aside>

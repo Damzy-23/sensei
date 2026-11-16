@@ -1,5 +1,6 @@
 import { useApp, type PageId } from "./app-context";
 import { AgentActivity } from "./agent/AgentActivity";
+import { AgentControls } from "./agent/AgentControls";
 import { Explainer } from "./agent/Explainer";
 import { Glass } from "./agent/Glass";
 import { VoiceAgent } from "./agent/VoiceAgent";
@@ -67,7 +68,7 @@ export function App() {
         <div className="topbar-actions">
           <VoiceAgent />
           <span className="muted topbar-user">{user ? user.displayName ?? user.email : "Guest"}</span>
-          <button className="btn-ghost" style={{ height: 36 }} onClick={signOut}>{user ? "Sign out" : "Sign in"}</button>
+          <button className="btn-ghost" style={{ height: 36 }} data-agent="confirm" onClick={signOut}>{user ? "Sign out" : "Sign in"}</button>
         </div>
       </header>
       {sessionError && <div className="bubble notice" role="alert" style={{ margin: "16px 28px 0" }}>{sessionError}</div>}
@@ -84,6 +85,7 @@ export function App() {
       <Glass />
       <AgentActivity />
       <Explainer />
+      <AgentControls />
     </div>
   );
 }

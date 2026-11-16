@@ -130,13 +130,13 @@ function BulletRow({ score, onChange, onRemove }: { score: BulletScore; onChange
   const [open, setOpen] = useState(false);
   return (
     <div className="bullet-row">
-      <textarea className="textarea" rows={2} aria-label="Bullet text" value={score.text} onChange={(e) => onChange(e.target.value)} />
+      <textarea className="textarea" rows={2} aria-label="Bullet text" data-agent="confirm" value={score.text} onChange={(e) => onChange(e.target.value)} />
       <div style={{ display: "flex", flexDirection: "column", gap: 6, alignItems: "flex-end" }}>
         <span className={`bullet-score ${scoreClass(score)}`} aria-label={`Score ${score.score} out of ${score.max}`}>{score.score} / {score.max}</span>
         <button type="button" className="btn-ghost" style={{ height: 28, padding: "0 10px", fontSize: 12 }} aria-expanded={open} onClick={() => setOpen(!open)}>
           {open ? "Hide why" : "Why"}
         </button>
-        <button type="button" className="btn-ghost" style={{ height: 28, padding: "0 10px", fontSize: 12 }} onClick={onRemove}>Remove</button>
+        <button type="button" className="btn-ghost" style={{ height: 28, padding: "0 10px", fontSize: 12 }} data-agent="confirm" onClick={onRemove}>Remove</button>
       </div>
       {open && (
         <ul className="check-list">
@@ -321,9 +321,10 @@ export function CvStudio() {
           <textarea id="cv-job" className="textarea" rows={9} value={job} onChange={(e) => setJob(e.target.value)} placeholder="Paste the job description" />
           <span className="dim" style={{ fontSize: 12 }}>At least {MIN_JOB} characters.</span>
           <label className="label" htmlFor="cv-text" style={{ marginTop: 8 }}>Your CV</label>
-          <textarea id="cv-text" className="textarea" rows={12} value={cvText} onChange={(e) => setCvText(e.target.value)} placeholder="Paste your CV as text" />
+          <textarea id="cv-text" className="textarea" rows={12} data-agent="confirm" value={cvText} onChange={(e) => setCvText(e.target.value)} placeholder="Paste your CV as text" />
           <span className="dim" style={{ fontSize: 12 }}>At least {MIN_CV} characters. Only what is written here is used.</span>
-          <button type="submit" className="btn-primary" disabled={busy || tooShort} style={{ marginTop: 8 }}>
+          <button type="submit" className="btn-primary" disabled={busy || tooShort} style={{ marginTop: 8 }}
+            data-agent={result.status === "ready" ? "confirm" : undefined}>
             {busy ? "Tailoring…" : "Tailor my CV"}
           </button>
         </form>
@@ -348,7 +349,7 @@ export function CvStudio() {
               <div className="cv-tools"><FitCard fit={cv.fit} /></div>
               <Paper cv={cv} />
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-                <button className="btn-primary" onClick={() => window.print()}>Download PDF</button>
+                <button className="btn-primary" data-agent="confirm" onClick={() => window.print()}>Download PDF</button>
                 <span className="dim" style={{ fontSize: 12 }}>Opens the print dialog: choose “Save as PDF”. Trace {idTag(cv.trace_id)}</span>
               </div>
 
@@ -396,12 +397,12 @@ export function CvStudio() {
                       </div>
                       <div style={{ flex: "1 1 320px" }}>
                         <label className="dim" style={{ fontSize: 12 }} htmlFor="new-line">New line</label>
-                        <textarea id="new-line" className="textarea" rows={2} value={newLine.text} placeholder="Cut deploy time by 60% by…"
+                        <textarea id="new-line" className="textarea" rows={2} data-agent="confirm" value={newLine.text} placeholder="Cut deploy time by 60% by…"
                           onChange={(e) => setNewLine({ ...newLine, text: e.target.value, score: null })} />
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", marginTop: 10 }}>
-                      <button type="button" className="btn-primary" style={{ height: 36 }} disabled={!draftText || blankLeft || !newLine.score} onClick={addLine}>Add to my CV</button>
+                      <button type="button" className="btn-primary" style={{ height: 36 }} data-agent="confirm" disabled={!draftText || blankLeft || !newLine.score} onClick={addLine}>Add to my CV</button>
                       {draftText && newLine.score && <span className={`bullet-score ${scoreClass(newLine.score)}`}>{newLine.score.score} / {newLine.score.max}</span>}
                       {blankLeft && <span className="sky" style={{ fontSize: 12 }}>Fill in the [blanks] with what you actually did before adding it.</span>}
                     </div>

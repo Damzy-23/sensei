@@ -132,7 +132,7 @@ export function Profile() {
                   <span style={{ width: `${(step / total) * 100}%` }} />
                 </div>
               </div>
-              <div className="chat-log" aria-live="polite">
+              <div className="chat-log" role="log" aria-label="Interview transcript" aria-live="polite">
                 {lines.map((l) => <div key={l.id} className={`bubble ${l.kind}`}>{l.text}</div>)}
                 {busy === "answer" && <div className="bubble coach dim mono" style={{ fontSize: 12 }}>career_agent is thinking…</div>}
                 <div ref={chatEnd} />
@@ -157,7 +157,7 @@ export function Profile() {
               {done && !busy && (
                 <div className="row-wrap" style={{ gap: 10 }}>
                   {!result && <button className="btn-primary" onClick={() => findRoles(profileId)}>Find my roles</button>}
-                  <button className="btn-ghost" onClick={start}>Start again</button>
+                  <button className="btn-ghost" data-agent="confirm" onClick={start}>Start again</button>
                 </div>
               )}
             </>

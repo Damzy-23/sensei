@@ -1,11 +1,13 @@
 // Page tools: the typed actions an agent (voice or text) may take on the UI.
 //
 // A screen registers handlers for the tools it can serve; an agent runtime calls `invoke`.
-// Tools change React state through those handlers. They never click or scrape the DOM,
-// so the agent can only do what a screen has chosen to expose.
+// Most tools change React state through those handlers. The control tools (see_screen, press,
+// type_into, pick_option, read_screen, scroll_to) are the one exception: they operate the
+// visible controls as a person would, behind a guard (agent/controls.ts, docs/adr/0004).
 
 import type { Mode } from "../api";
 import type { PageId } from "../app-context";
+import type { PickResult, PressResult, ReadResult, ScreenView, TypeResult } from "./controls";
 import pageTools from "./page-tools.json";
 
 export interface PageSnapshot {
@@ -43,6 +45,14 @@ export interface ToolSignatures {
   play_explainer: [{ title: string; scenes: { caption: string; values: string; pointers: string }[] }, { playing: true; scenes: number; seconds: number }];
   write_line: [{ after_line: number }, { written: string; at_line: number }];
   propose_calendar_event: [{ title: string; start: string; minutes: number; details: string }, { offered: true; start: string; end: string }];
+  // The control layer (agent/controls.ts): any control a person can use, by its name on screen,
+  // through the guard in agent/control-rules.ts. Some actions wait for the student's click.
+  see_screen: [Record<string, never>, ScreenView];
+  press: [{ control: string }, PressResult];
+  type_into: [{ control: string; text: string; submit: string }, TypeResult];
+  pick_option: [{ control: string; option: string }, PickResult];
+  read_screen: [{ part: string }, ReadResult];
+  scroll_to: [{ control: string }, { scrolled_to: string }];
 }
 export type ToolName = keyof ToolSignatures;
 export type ToolHandler<N extends ToolName> = (args: ToolSignatures[N][0]) => Promise<ToolSignatures[N][1]> | ToolSignatures[N][1];

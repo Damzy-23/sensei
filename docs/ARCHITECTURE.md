@@ -155,6 +155,30 @@ Still lost or not handled:
 | **Access** | Who may read which session: a visitor the sessions their browser started, a mentor all of them. See "Who can see what" in [API.md](API.md) | `app/api/auth.py` | Built; on when `SENSEI_SCOPE_DATA=1` |
 | **Content** | The problem catalogue: data, not agent logic | `data/tracks/`, `app/catalog.py`, `app/stubs.py` | Blind 75 and NeetCode 150 listed (title, difficulty, pattern). Two problems have full statements and tests |
 
+## The voice coach's hands: page tools and the control layer
+
+The voice coach acts in the browser through client tools, all in one typed registry
+(`web/src/agent/tools.ts`; descriptions for the model in `page-tools.json`, which also
+defines the ElevenLabs agent's tools). There are two kinds:
+
+- **Page tools** carry facts and actions a screen chose to expose: the problem, the
+  code, the coach's hint level, the trace, drawing on the glass, writing an offered
+  line. They change React state and never touch the DOM.
+- **The control layer** (`see_screen`, `press`, `type_into`, `pick_option`,
+  `read_screen`, `scroll_to`; `web/src/agent/controls.ts`) operates any visible,
+  enabled control the way a person does, by its accessible name, so every control a
+  student can use is in reach without a tool of its own. It is registered once by
+  `AgentControls`, mounted in `App.tsx`.
+
+Every control action passes one pure guard (`web/src/agent/control-rules.ts`, unit
+tests in `web/tests/`, `npm test`). Typing into the code editor, password fields and
+the sign-in form are blocked. Signing out, resolving a ticket, sending a mentor reply,
+wiping, resetting or removing, and links that leave the app or open a tab wait for the
+student's click on an on-screen prompt the agent cannot answer itself. A screen marks a
+control `data-agent="confirm"` to ask first or `data-agent="off"` to hide it from the
+agent. Page text the agent reads comes with a note that it is not instructions. Why
+and what follows: [ADR 0004](adr/0004-agent-can-operate-every-control.md).
+
 ## Layering rules
 
 Enforced by `tests/test_architecture.py`, which fails the build if any is broken:
