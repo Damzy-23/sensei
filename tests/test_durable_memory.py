@@ -13,6 +13,7 @@ import itertools
 import json
 import logging
 import threading
+import time
 from collections import defaultdict
 from collections.abc import Callable, Iterator
 
@@ -52,6 +53,9 @@ class FakeFirestore:
         self.gate = threading.Event()  # cleared: writes stall until it is set again
         self.gate.set()
         self.writing = threading.Event()  # set once a write has reached Firestore
+        self.write_delay = 0.0  # seconds each write takes, as a real commit does
+        self.failing_writes = 0  # the next this many writes raise, as a real commit sometimes does
+        self.failing_queries: set[str] = set()  # collections whose queries raise
 
     def collection(self, name: str) -> _Query:
         if self.down:
@@ -85,9 +89,14 @@ class _Document:
     def __init__(self, fake: FakeFirestore, collection: str, doc_id: str) -> None:
         self.fake, self.collection, self.id = fake, collection, doc_id
 
-    def set(self, data: dict) -> None:
+    def set(self, data: dict, **options: object) -> None:
         self.fake.writing.set()
         self.fake.gate.wait(5)
+        if self.fake.write_delay:
+            time.sleep(self.fake.write_delay)
+        if self.fake.failing_writes:
+            self.fake.failing_writes -= 1
+            raise RuntimeError("INTERNAL: the commit failed")
         _check_storable(data)
         self.fake.docs[self.collection][self.id] = copy.deepcopy(data)
         self.fake.writes.append((self.collection, self.id))
@@ -116,6 +125,8 @@ class _Query:
         return _Query(self.fake, self.name, self._where, self._order, count)
 
     def stream(self, **options: object) -> Iterator[_Snapshot]:
+        if self.name in self.fake.failing_queries:
+            raise RuntimeError("UNAVAILABLE: the query failed")
         if self._where and self._order and self._order[0] != self._where[0]:
             raise RuntimeError("FAILED_PRECONDITION: The query requires an index.")
         self.fake.reads.append(("query", self.name, f"where={self._where} order={self._order} limit={self._limit}"))
@@ -170,6 +181,7 @@ def firestore(model: ScriptedModel, monkeypatch) -> FakeFirestore:
     """Durable memory switched on, over the fake."""
     fake = FakeFirestore()
     monkeypatch.setenv("SENSEI_STATE_FIRESTORE_DB", "senior-test")
+    monkeypatch.setattr(durable, "WRITE_RETRY_PAUSES", (0.0, 0.0))  # a failing write gives up at once
     monkeypatch.setattr(durable, "_client", lambda: fake)
     return fake
 
@@ -239,7 +251,7 @@ def _new(client: TestClient) -> str:
     [
         ("", "", "0", False),  # nothing named: off
         ("senior", "", "0", True),
-        ("", "senior", "0", True),  # the activity log's database is enough: no new setting on the live service
+        ("", "senior", "0", False),  # off a laptop; on Cloud Run it is borrowed (test further down)
         ("senior", "senior", "1", False),  # never with stub data
     ],
 )
@@ -251,6 +263,7 @@ def test_it_is_on_only_when_a_database_is_named_and_never_with_stubs(monkeypatch
 
 
 def test_its_own_database_setting_wins_over_the_activity_logs(monkeypatch) -> None:
+    monkeypatch.setenv("K_SERVICE", "senior")
     monkeypatch.setenv("SENSEI_LOG_FIRESTORE_DB", "senior")
     assert durable._database() == "senior"
     monkeypatch.setenv("SENSEI_STATE_FIRESTORE_DB", "senior-state")
@@ -515,20 +528,32 @@ def test_when_firestore_is_down_everything_still_works_from_sqlite(firestore, re
     assert memory.get_ticket(ticket.id).transcript == memory.transcript(sid)
     assert memory.resolve_ticket(ticket.id).status == "resolved"
     assert memory.add_message(sid, "mentor", "Try a smaller input.").actor == "mentor"
-    assert memory.get_session("ses_nobody") is None
-    assert memory.get_ticket("tkt_nothing") is None and memory.resolve_ticket("tkt_nothing") is None
-    assert client.get("/sessions/ses_nobody/state").status_code == 404
-    assert client.get("/mentor/tickets/tkt_nothing").status_code == 404
-    assert durable.fetch_session(sid) is None and durable.fetch_messages(sid) == []
-    assert durable.fetch_tickets(10) is None and durable.fetch_ticket(ticket.id) is None  # None: the read failed
+
+    # What SQLite does not have cannot be looked up while the copy is down. It may exist, so the
+    # answer is "try again in a few seconds", never "no such thing" and never an error page.
+    for ask in (lambda: memory.get_session("ses_nobody"), lambda: memory.get_ticket("tkt_nothing"),
+                lambda: memory.resolve_ticket("tkt_nothing")):
+        with pytest.raises(memory.MemoryUnavailable):
+            ask()
+    for path in ("/sessions/ses_nobody/state", "/mentor/tickets/tkt_nothing"):
+        r = client.get(path)
+        assert r.status_code == 503 and r.headers["retry-after"] == "5", (path, r.status_code)
+    durable.reset()  # past the pause, so each read below really is tried
+    for read in (lambda: durable.fetch_session(sid), lambda: durable.fetch_messages(sid),
+                 lambda: durable.fetch_tickets(10), lambda: durable.fetch_ticket(ticket.id)):
+        with pytest.raises(durable.MemoryUnavailable):
+            read()
+        durable.reset()
 
     assert durable.flush(5)  # the writer tried each write, failed, and moved on
     assert firestore.writes == [] and not any(firestore.docs.values())
 
-    restart()  # nothing was mirrored, so nothing comes back: as "not found", never as an error
-    assert memory.get_session(sid) is None and memory.list_tickets() == []
-    assert client.get(f"/sessions/{sid}/state").status_code == 404
-    assert client.post(f"/sessions/{sid}/message", json={"text": "hi", "problem_id": "two-sum"}).status_code == 404
+    restart()  # nothing was mirrored, and while the copy is down that cannot be known: "try again"
+    with pytest.raises(memory.MemoryUnavailable):
+        memory.get_session(sid)
+    assert memory.list_tickets() == []  # a list answers with what SQLite has
+    assert client.get(f"/sessions/{sid}/state").status_code == 503
+    assert client.post(f"/sessions/{sid}/message", json={"text": "hi", "problem_id": "two-sum"}).status_code == 503
 
 
 def test_a_full_queue_drops_the_write_with_a_warning_and_never_blocks(firestore, monkeypatch, caplog) -> None:
@@ -614,18 +639,20 @@ def test_a_session_the_copy_does_not_have_is_asked_for_once_then_believed_for_a_
     assert memory.get_session("ses_gone") is None
     assert len(firestore.reads) == 2
 
-    # The same holds when the copy could not be read at all: no pile-up of slow reads during an
-    # outage, and the session is found again once the copy answers.
+    # A copy that could not be read is not a miss: it is not remembered as missing, and the
+    # session is found as soon as the copy answers again.
     monkeypatch.setattr(memory, "LOOK_AGAIN_SECONDS", 15.0)
+    monkeypatch.setattr(durable, "BACK_OFF_SECONDS", 0.0)
     session, _ = _seed()
     restart()
     firestore.down = True
-    assert memory.get_session(session.session_id) is None
+    with pytest.raises(memory.MemoryUnavailable):
+        memory.get_session(session.session_id)
     firestore.down = False
-    assert memory.get_session(session.session_id) is None  # still believed
-    monkeypatch.setattr(memory, "LOOK_AGAIN_SECONDS", 0.0)
     assert memory.get_session(session.session_id) == session
-    assert memory.get_session(session.session_id) == session  # and from SQLite from now on
+    reads = len(firestore.reads)
+    assert memory.get_session(session.session_id) == session
+    assert len(firestore.reads) == reads  # from SQLite from now on
 
 
 def test_the_mentor_queue_is_tried_again_when_its_first_read_failed(firestore, restart, monkeypatch) -> None:
@@ -634,10 +661,168 @@ def test_the_mentor_queue_is_tried_again_when_its_first_read_failed(firestore, r
     firestore.down = True
     assert memory.list_tickets() == []
     firestore.down = False
-    assert memory.list_tickets() == []  # not on every request
-    monkeypatch.setattr(memory, "LOOK_AGAIN_SECONDS", 0.0)
+    assert memory.list_tickets() == []  # not on every request: reads pause briefly after a failure
+    monkeypatch.setattr(durable, "BACK_OFF_SECONDS", 0.0)  # the pause is over
     assert [t.id for t in memory.list_tickets()] == [ticket_id]
     reads = len(firestore.reads)
     assert [t.id for t in memory.list_tickets()] == [ticket_id]
     assert len(firestore.reads) == reads  # loaded: answered from SQLite from now on
+
+
+# ---------- found by the review after the first deploy ----------
+
+
+def test_a_transcript_that_cannot_be_read_restores_nothing_and_the_session_comes_back_whole_later(
+        firestore, restart, monkeypatch) -> None:
+    """A restore is all or nothing. If the transcript could not be read, writing the session alone
+    would leave SQLite with a session that has no history, and nothing would ever ask again."""
+    monkeypatch.setattr(durable, "BACK_OFF_SECONDS", 0.0)
+    session, ticket_id = _seed()
+    thread = memory.transcript(session.session_id)
+    restart()
+    firestore.failing_queries = {"state_messages"}
+    with pytest.raises(memory.MemoryUnavailable):
+        memory.get_session(session.session_id)
+    assert _rows() == {"sessions": 0, "messages": 0, "tickets": 0}  # nothing half-restored
+
+    r = TestClient(app).get(f"/sessions/{session.session_id}/state")
+    assert r.status_code == 503 and r.headers["retry-after"]  # "try again", not "no such session"
+    assert "try again" in r.json()["detail"].lower()
+
+    firestore.failing_queries = set()
+    assert memory.get_session(session.session_id) == session
+    assert memory.transcript(session.session_id) == thread
+    assert memory.get_ticket(ticket_id).transcript == thread
+
+
+def test_while_the_copy_is_unreachable_no_request_waits_on_it_again_for_a_few_seconds(firestore, restart, monkeypatch) -> None:
+    """One failed read pauses all recovery reads briefly: stale tabs polling different ids
+    must not each hold the server for the read's whole deadline."""
+    session, ticket_id = _seed()
+    restart()
+    firestore.down = True
+    with pytest.raises(memory.MemoryUnavailable):
+        memory.get_session("ses_tab_one")
+    reads = len(firestore.reads)
+    for ask in (lambda: memory.get_session("ses_tab_two"), lambda: memory.get_ticket("tkt_other"),
+                lambda: memory.get_session(session.session_id)):
+        with pytest.raises(memory.MemoryUnavailable):
+            ask()
+    assert len(firestore.reads) == reads  # none of them touched Firestore
+    assert memory.list_tickets() == []  # a list still answers, from what SQLite has
+
+    firestore.down = False
+    monkeypatch.setattr(durable, "BACK_OFF_SECONDS", 0.0)  # the pause is over
+    assert memory.get_session(session.session_id) == session
+    assert [t.id for t in memory.list_tickets()] == [ticket_id]
+
+
+def test_an_unknown_ticket_id_is_asked_for_once_then_believed_for_a_while(firestore, restart) -> None:
+    restart()
+    for _ in range(4):
+        assert memory.get_ticket("tkt_nothing") is None
+    assert [r for r in firestore.reads if r[0] == "get"] == [("get", "state_tickets", "tkt_nothing")]
+
+
+def test_a_mentor_action_on_a_session_that_cannot_be_read_changes_nothing(firestore, restart, monkeypatch) -> None:
+    monkeypatch.setattr(durable, "BACK_OFF_SECONDS", 0.0)
+    session, ticket_id = _seed()
+    restart()
+    memory.list_tickets()  # the queue is back; the session is not yet
+    firestore.failing_queries = {"state_messages"}
+    with pytest.raises(memory.MemoryUnavailable):
+        memory.resolve_ticket(ticket_id)
+    assert memory._find_ticket(ticket_id)["status"] == "open"  # not resolved behind the mentor's back
+    firestore.failing_queries = set()
+    assert memory.resolve_ticket(ticket_id).status == "resolved"
+
+
+def test_messages_keep_their_order_whenever_they_were_written_into_sqlite(firestore, restart) -> None:
+    """A message can reach SQLite before the older conversation is restored (a mentor answering
+    straight after a restart). The transcript is still oldest first."""
+    session, _ = _seed()
+    thread = [m.text for m in memory.transcript(session.session_id)]
+    restart()
+    memory._copy_in(sessions=[(session.session_id, json.dumps(session.__dict__))])  # the row, not yet the messages
+    late = memory.add_message(session.session_id, "mentor", "Look at the second example.")
+    memory._copy_in(messages=durable.fetch_messages(session.session_id))
+    assert [m.text for m in memory.transcript(session.session_id)] == thread + [late.text]
+    assert [m.text for m in memory.transcript(session.session_id, limit=2)] == thread[-1:] + [late.text]
+
+
+def test_a_write_that_fails_once_is_sent_again(firestore, monkeypatch) -> None:
+    monkeypatch.setattr(durable, "WRITE_RETRY_PAUSES", (0.0, 0.0))
+    session = memory.create_session("learn")
+    firestore.failing_writes = 1
+    message = memory.add_message(session.session_id, "student", "I'm stuck")
+    assert durable.flush(5)
+    assert firestore.docs["state_messages"][message.id]["text"] == "I'm stuck"
+
+
+def test_a_request_that_saved_something_ends_only_once_the_copy_is_sent(firestore) -> None:
+    """On Cloud Run the server only surely has CPU while a request is open, so the writes of a
+    request are sent before it ends, not at some later moment."""
+    firestore.write_delay = 0.2
+    client = TestClient(app)
+    sid = _new(client)
+    assert durable.pending() == 0 and sid in firestore.docs["state_sessions"]
+    _send(client, sid)
+    assert durable.pending() == 0
+    assert len([m for m in firestore.docs["state_messages"].values() if m["session_id"] == sid]) == 2
+
+
+def test_a_request_does_not_wait_on_a_copy_that_is_failing(firestore, monkeypatch) -> None:
+    monkeypatch.setattr(durable, "WRITE_RETRY_PAUSES", (0.0, 0.0))
+    monkeypatch.setattr(durable, "WRITE_RETRY_PAUSES", (3.0, 3.0))  # still trying that write when the next request comes
+    firestore.down = True
+    client = TestClient(app)
+    _new(client)
+    firestore.write_delay = 1.0
+    started = time.monotonic()
+    sid = _new(client)
+    assert time.monotonic() - started < 0.5 and sid  # answered without waiting on the copy
+    firestore.down = False
+    firestore.write_delay = 0.0
+    assert durable.flush(10)  # the retried write gets through once the copy answers
+    assert len(firestore.docs["state_sessions"]) == 2
+
+
+def test_when_the_copy_is_slow_only_one_request_waits_for_it(firestore, monkeypatch) -> None:
+    """A write against a database that does not answer can take seconds to fail. The first
+    request waits up to its limit; the ones after it do not, until the queue has emptied."""
+    import app.main as main
+
+    monkeypatch.setattr(main, "SEND_BEFORE_REPLYING_SECONDS", 0.3)
+    firestore.write_delay = 1.5
+    client = TestClient(app)
+    started = time.monotonic()
+    _new(client)
+    first = time.monotonic() - started
+    started = time.monotonic()
+    _new(client)
+    second = time.monotonic() - started
+    assert 0.3 <= first < 1.0 and second < 0.2, (first, second)
+    assert durable.flush(10) and durable.writing_well()  # once the queue is empty, requests wait again
+
+
+def test_shutting_down_sends_what_is_still_queued(firestore) -> None:
+    firestore.write_delay = 0.2
+    with TestClient(app):  # runs the app's start and shutdown, as uvicorn does
+        session = memory.create_session("learn")  # queued, not sent: no request is open
+        assert durable.pending() >= 1
+    assert durable.pending() == 0 and session.session_id in firestore.docs["state_sessions"]
+
+
+@pytest.mark.parametrize(("on_cloud_run", "expected"), [(True, True), (False, False)])
+def test_the_activity_logs_database_is_borrowed_only_on_cloud_run(monkeypatch, on_cloud_run, expected) -> None:
+    """A laptop run that shows the live activity log must not also write test sessions into the
+    live service's collections, or copy its students' chats onto the laptop."""
+    monkeypatch.setenv("SENSEI_STATE_FIRESTORE_DB", "")
+    monkeypatch.setenv("SENSEI_LOG_FIRESTORE_DB", "senior")
+    monkeypatch.setenv("SENSEI_USE_STUBS", "0")
+    if on_cloud_run:
+        monkeypatch.setenv("K_SERVICE", "senior")
+    else:
+        monkeypatch.delenv("K_SERVICE", raising=False)
+    assert durable.enabled() is expected
 

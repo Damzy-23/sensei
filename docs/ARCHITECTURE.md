@@ -76,28 +76,56 @@ deploy. So that a deploy does not end every conversation:
 
 - **Mirrored on write.** Each write of a session, a message or a mentor ticket
   is also queued for Firestore (collections `state_sessions`, `state_messages`,
-  `state_tickets`). A background thread sends the queue: a reply never waits on
-  Firestore, and a write that fails is logged, not raised.
-- **Restored on demand.** SQLite stays the store every read uses. When a
-  session is asked for and SQLite does not have it, the session, its whole
-  transcript and its tickets are copied back from Firestore in one transaction
-  and the request carries on. The mentor queue comes back the same way: its
-  newest 200 tickets, once per process, the first time it is listed. This
-  recovery read is the only time a request waits on Firestore. It gives up
-  after 5 seconds, and then the session is "not found", as it was before.
-- **On when** `SENSEI_STATE_FIRESTORE_DB` names a Firestore database, or
-  failing that `SENSEI_LOG_FIRESTORE_DB` (the activity log's database). Always
-  off with `SENSEI_USE_STUBS=1`.
+  `state_tickets`). One background thread sends the queue in order, so a reply
+  is never computed while waiting on Firestore. A write that fails is tried
+  twice more (after 0.5 s and 2 s), then logged and dropped.
+- **Sent before the request ends.** On Cloud Run an instance only surely has
+  CPU while a request is open, so the end of each response is held until the
+  writes it queued are sent, for at most 2 seconds (`SendCopyBeforeReplying`
+  in `app/main.py`). The client already has the whole reply by then; only the
+  closing of the connection waits. While writes are failing, nobody waits.
+- **Restored on demand, all or nothing.** SQLite stays the store every read
+  uses. When a session is asked for and SQLite does not have it, the session,
+  its whole transcript and its tickets are read from Firestore and copied in
+  one transaction, and the request carries on. If any of those reads fails,
+  nothing is written and the request is answered `503` with `Retry-After: 5`
+  ("try again in a few seconds"): the session may well exist, so it is not a
+  `404`. The next request restores it whole. The mentor queue comes back the
+  same way: its newest 200 tickets, once per process, the first time it is
+  listed; while that read fails, the queue shows what SQLite has.
+- **Bounded waiting.** Each recovery read gives up after 5 seconds. After one
+  fails, no recovery read is tried for 5 seconds by any request, so requests do
+  not queue up behind a database that is not answering. An id the copy does
+  not have (a stale browser tab) is believed missing for 15 seconds.
+- **Shutdown.** On a deploy Cloud Run sends SIGTERM and allows 10 seconds.
+  uvicorn gives open requests 4 seconds (`--timeout-graceful-shutdown 4`),
+  then the app's shutdown sends what is still queued, for up to 4 seconds.
+  This runs inside uvicorn's own shutdown; an exit hook would not run, because
+  uvicorn re-raises SIGTERM after shutting down.
+- **On when** `SENSEI_STATE_FIRESTORE_DB` names a Firestore database. On Cloud
+  Run (`K_SERVICE` set) it otherwise uses `SENSEI_LOG_FIRESTORE_DB`, the
+  activity log's database, so the live service needs no extra setting. A laptop
+  run with only the activity log's database set stays off, so it never writes
+  test sessions into the live collections. Always off with `SENSEI_USE_STUBS=1`.
 
-Still lost:
+What is stored is the session state, every chat message in full, the
+student's code and the mentor tickets, unredacted (the activity log, by
+contrast, is cut to 500 characters). Nothing deletes it yet; the privacy page
+(`web/public/privacy.html`) says it is kept until the project ends.
+
+Still lost or not handled:
 
 - Trace events are not restored. The inspector for a restored session starts
   empty; the events are still in the activity log (`/logs`).
-- The last writes before a crash, because writes are queued. A clean shutdown
-  waits up to 5 seconds for the queue to empty.
-- A session is restored once, when it is first asked for. What the old
-  container writes after that (a turn still running during a deploy) is not
-  picked up.
+- The last writes before a crash (not a clean shutdown), because writes are
+  queued.
+- A write given up on after three tries. A session or ticket heals on its next
+  save; a message is written once, so it is missing from the restored
+  transcript. The log says which.
+- Two containers writing the same session during a deploy. A session is
+  restored once, when it is first asked for; a turn still running in the old
+  container when traffic moves is not picked up, and its late write can land
+  over the new container's. There is no version check on writes.
 - Career profiles (`app/memory/profiles.py`) are not mirrored.
 
 ### Not one of the six

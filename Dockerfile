@@ -17,6 +17,7 @@ COPY config/ config/
 COPY data/tracks/ data/tracks/
 COPY data/problems.json data/problems.json
 COPY --from=web /web/dist web/dist
-# exec: the server itself receives the stop signal on a deploy, so it shuts down cleanly and
-# sends what is still queued for the durable copy (app.memory.durable) before it exits.
-CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT}"]
+# exec: the server itself receives the stop signal on a deploy. Cloud Run allows 10 s after it:
+# open requests get 4 s to finish, then the app's shutdown sends what is still queued for the
+# durable copy (app.main lifespan, app.memory.durable), with 4 s for that.
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --timeout-graceful-shutdown 4"]
