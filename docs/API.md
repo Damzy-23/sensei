@@ -443,3 +443,12 @@ curl -s localhost:8000/problems/two-sum
 curl -N -X POST localhost:8000/sessions/ses_demo/message -H 'content-type: application/json' \
   -d '{"text":"stuck","problem_id":"two-sum","code":""}'
 ```
+
+### `GET /eval/report` → 200 | 404
+
+The report of the last evaluation run on real models (`app/eval/report.json`, written by
+`scripts/run_eval.py`; see docs/EVALUATION.md). `404` when no run has been recorded: never
+placeholder numbers. Every rate is `{"n": int, "of": int, "rate": float | null}`; `rate` is
+null when `of` is 0. Top-level fields: `generated_at`, `commit`, `scenarios_version`,
+`models`, `scenarios`, `overall`, `by_family`, `by_hint_level_learn_mode`, `latency_ms`,
+`cost_usd`, `failing_turns`, `limits`.

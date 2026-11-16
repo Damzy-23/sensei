@@ -16,8 +16,9 @@ The API contract is in [API.md](API.md). Decisions and their reasons are in
 model: input guard, agent selection, hint ladder, hint coach and interviewer,
 the observer who sits in on interviews, leak check with rewrite, escalation to a
 mentor, test-run handling, and the evaluator's scored feedback, all traced. It
-runs when `SENSEI_USE_STUBS=0`. Not built yet: the planner agent, the eval
-harness for a tuned hint model, and full statements for most track problems.
+runs when `SENSEI_USE_STUBS=0`. The evaluation of the coach against its own rules
+on real model output is built (docs/EVALUATION.md). Not built yet: the planner agent,
+the tuned-versus-base comparison of hint models, and full statements for most track problems.
 Each row below says which.
 
 ## One turn, end to end
@@ -121,7 +122,7 @@ Still lost:
 |---|---|---|---|
 | **Observability** | Cost, model and the "why" for every step, streamed live to the inspector and kept for audit | `app/tracing/` | Span context, store, prices, redaction built |
 | **Model gateway** | The single path to a model: model choice, base vs tuned hint model, pricing | `app/llm/gateway.py` | Built |
-| **Evaluation** | Tuned vs base hint model: pairwise win rate, leak rate as a hard fail | `app/eval/` | Stubbed; results endpoint built |
+| **Evaluation** | Does the coach keep to its rules on real output: code allowed, approach named too early, level adherence, by rule checks and a model judge (docs/EVALUATION.md). Tuned vs base hint model comparison | `app/eval/`, `scripts/run_eval.py` | Built: `GET /eval/report`. Tuned vs base: `GET /eval/results` is still a placeholder |
 | **HTTP layer** | Routes only, no business rules | `app/api/`, `app/main.py` | Built |
 | **Access** | Who may read which session: a visitor the sessions their browser started, a mentor all of them. See "Who can see what" in [API.md](API.md) | `app/api/auth.py` | Built; on when `SENSEI_SCOPE_DATA=1` |
 | **Content** | The problem catalogue: data, not agent logic | `data/tracks/`, `app/catalog.py`, `app/stubs.py` | Blind 75 and NeetCode 150 listed (title, difficulty, pattern). Two problems have full statements and tests |
