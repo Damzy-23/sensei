@@ -535,3 +535,9 @@ h2 { font-size: 20px; line-height: 26px; letter-spacing: -0.3px; }
 .agent-ask-clock span { display: block; height: 100%; background: var(--sky); transform-origin: left; animation: agent-ask-clock 20s linear forwards; }
 .agent-ask-note { font-size: 12px; line-height: 16px; }
 @keyframes agent-ask-clock { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+/* On a phone the status line sits at the top, as one slim line, so it never covers the message box. */
+@media (max-width: 760px) {
+  .agent-activity { top: 8px; bottom: auto; left: 8px; right: 8px; width: auto; max-height: 64px; padding: 8px 12px; gap: 4px; font-size: 12px; }
+  .agent-activity-toggle { top: 8px; bottom: auto; left: 8px; }
+}

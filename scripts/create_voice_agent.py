@@ -38,7 +38,8 @@ def tools() -> list[dict]:
             "name": name,
             "description": tool["description"],
             "expects_response": True,
-            "response_timeout_secs": 60 if name == "ask_coach" else 20,
+            # press, type_into and pick_option may wait up to 20 s for the student to click Allow.
+            "response_timeout_secs": 60 if name == "ask_coach" else 30 if name in ("press", "type_into", "pick_option") else 20,
             # No spoken filler before an action ("let me take a look"): the student asked for less talk.
             "pre_tool_speech": "off",
             "force_pre_tool_speech": False,
