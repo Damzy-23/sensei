@@ -73,13 +73,17 @@ def test_message_streams_trace_then_final(client: TestClient, session_id: str) -
         text = "".join(r.iter_text())
 
     events = _parse_sse(text)
-    assert events[-1][0] == "final"
-    trace_events = [data for name, data in events if name == "trace"]
-    assert trace_events, "expected trace events before the final event"
-    final = events[-1][1]
+    names = [name for name, _ in events]
+    assert names.count("final") == 1
+    at = names.index("final")
+    assert at > 0 and set(names[:at]) == {"trace"}, "expected trace events before the final event"
+    final = events[at][1]
     assert set(final) >= {"reply", "mode", "hint_level", "escalated", "trace_id"}
     assert final["mode"] in {"learn", "interview", "blitz"}
     assert not (FORBIDDEN_KEYS & _walk_keys(final))
+    # Only the picture for the reply may follow it: the illustrator's steps, then one drawing.
+    assert set(names[at + 1:]) <= {"trace", "drawing"} and names[-1] == "drawing"
+    assert not (FORBIDDEN_KEYS & _walk_keys(events[-1][1]))
 
 
 def test_message_unknown_session_is_404(client: TestClient) -> None:

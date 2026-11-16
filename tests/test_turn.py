@@ -26,6 +26,9 @@ class ScriptedModel:
         self.calls: list[tuple[str, str]] = []
 
     async def complete(self, *, model: str, system: str, user: str, max_tokens: int, effort: str) -> LLMResult:
+        if "Senior's illustrator" in system:
+            # The picture that follows a reply has its own tests (tests/test_illustrator.py); `calls` is the reply's.
+            return LLMResult(json.dumps({"kind": "none", "reason": "not under test here"}), model, 50, 10)
         self.calls.append((model, user))
         if "Classify the" in system:
             text = json.dumps({"category": self.category, "confidence": 0.9, "reason": "they say they are stuck"})
@@ -61,9 +64,13 @@ def _events(body: str) -> list[tuple[str, dict]]:
 
 
 def _send(client: TestClient, session_id: str, text: str = "I'm stuck", problem: str = "two-sum") -> list[tuple[str, dict]]:
+    """The reply part of the stream: every event up to and including `final` or `error`.
+    What may follow `final` in learn mode, the illustrator's picture, is in tests/test_illustrator.py."""
     r = client.post(f"/sessions/{session_id}/message", json={"text": text, "problem_id": problem, "code": "pass"})
     assert r.status_code == 200
-    return _events(r.text)
+    events = _events(r.text)
+    end = next(i for i, (name, _) in enumerate(events) if name in {"final", "error"})
+    return events[: end + 1]
 
 
 def _new(client: TestClient, mode: str = "learn") -> str:

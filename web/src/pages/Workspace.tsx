@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ApiError, getMentorMessages, getProblem, getState, getTrace, getTrack, postRun, sendMessage,
-  type Mode, type Problem, type ProblemDetail, type SessionState, type TraceNode,
+  type Drawing, type Mode, type Problem, type ProblemDetail, type SessionState, type TraceNode,
 } from "../api";
-import { registerTool, type PageSnapshot } from "../agent/tools";
+import { invoke, registerTool, type PageSnapshot } from "../agent/tools";
 import { MODE_COLOR, useApp } from "../app-context";
 import { entryPoint, runCode, runTests, type TestResult } from "../runner";
 import { CodeEditor, RichText } from "../components/CodeEditor";
@@ -77,6 +77,22 @@ function withLineAdded(source: string, line: string, after: number | null): { so
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
+// How long the voice agent's ask_coach waits to learn whether a picture was drawn. Typed chat never waits.
+const DRAW_WAIT_MS = 2500;
+
+/** Put the illustrator's picture on the glass through the page tools, so it shows in the
+ *  "Senior is doing" feed and obeys the glass's own limits. Returns what was drawn, in words
+ *  the voice agent can read, or null if the glass refused it. */
+async function drawOnGlass(d: Drawing): Promise<string | null> {
+  const drawn =
+    d.kind === "array" ? await invoke("glass_array", { values: d.values, pointers: d.pointers, caption: d.caption })
+    : d.kind === "steps" ? await invoke("glass_steps", { title: d.title, steps: d.values })
+    : await invoke("glass_3d", { scene: d.kind, values: d.values, pointers: d.pointers, water: d.water, highlight: d.highlight, edges: d.edges, caption: d.caption });
+  if (!drawn.ok) return null;
+  const about = d.kind === "steps" ? d.title : d.caption;
+  return `Already on the glass for this reply: ${d.kind}${about ? `. ${about}` : ""}`;
+}
+
 export function Workspace() {
   const { page, go, mode, setMode, sessionId, problemId, openProblem } = useApp();
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
@@ -148,22 +164,38 @@ export function Workspace() {
   const lastCoachBubble = [...bubbles].reverse().find((b) => b.kind === "coach");
   const offeredLine = lastCoachBubble ? offeredLineIn(lastCoachBubble.text) : null;
 
+  // Where the student is now, read by work that finishes later: a picture belongs to the
+  // session, the problem and the question it was drawn for.
+  const now = useRef({ sessionId, problemId });
+  now.current = { sessionId, problemId };
+  const asked = useRef(0);
+
   const ask = useCallback(async (text: string) => {
     if (!sessionId) throw new Error("The session is not ready yet.");
     say("student", text, "You");
     setBusy("Reading your message…");
     let steps = 0;
+    const turn = ++asked.current;
+    // The picture follows the reply. `drew` settles once: what went on the glass, or null for no picture.
+    let settle: (drew: string | null) => void = () => undefined;
+    const drew = new Promise<string | null>((resolve) => { settle = resolve; });
     try {
       const final = await sendMessage(sessionId, { text, problem_id: problemId, code }, (event) => {
         steps += 1;
         setBusy(`${event.actor.replace(/_/g, " ")} · ${event.name.replace(/_/g, " ")} · step ${steps}`);
+      }, (drawing) => {
+        // A picture for an old turn must not land on a new problem, a new mode or a newer question.
+        const current = turn === asked.current && now.current.sessionId === sessionId && now.current.problemId === problemId;
+        if (drawing && current) drawOnGlass(drawing).then(settle, () => settle(null));
+        else settle(null);
       });
       const who = final.mode === "learn" ? "Coach" : "Interviewer";
       say("coach", final.reply, final.mode === "learn" && final.hint_level > 0 ? `${who} · hint ${final.hint_level} of 5` : who);
       lastTraceId.current = final.trace_id;
       await refresh();
-      return { reply: final.reply, hint_level: final.hint_level, escalated: final.escalated };
+      return { reply: final.reply, hint_level: final.hint_level, escalated: final.escalated, drew };
     } catch (err) {
+      settle(null);
       const message = err instanceof Error ? err.message : String(err);
       say("notice", `The coach could not answer: ${message}`);
       throw err;
@@ -207,7 +239,12 @@ export function Workspace() {
       registerTool("navigate", ({ page: next }) => { go(next); return { page: next }; }),
       registerTool("set_mode", ({ mode: next }) => { setMode(next); return { mode: next }; }),
       registerTool("open_problem", ({ problem_id }) => { openProblem(problem_id); return { problem_id }; }),
-      registerTool("ask_coach", ({ text }) => ask(text)),
+      registerTool("ask_coach", async ({ text }) => {
+        const { drew, ...answer } = await ask(text);
+        // The agent hears about the picture if it lands within a moment; its reply waits no longer than that.
+        const waited = new Promise<null>((resolve) => { setTimeout(() => resolve(null), DRAW_WAIT_MS); });
+        return { ...answer, drew: await Promise.race([drew, waited]) };
+      }),
       registerTool("run_tests", () => run()),
       registerTool("run_code", () => runCode(code)),
       registerTool("read_code", () => {

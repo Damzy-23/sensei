@@ -18,6 +18,7 @@ from app.config import get_settings
 from app.memory import repository as memory
 from app.models import (
     ChatMessage, Debrief, FinalEvent, MessageIn, PanelView, RunIn, RunOut, SessionCreated, SessionCreateIn, SessionState,
+    TraceEvent,
 )
 from app.orchestrator import panel
 from app.orchestrator import turn as orchestrator
@@ -50,31 +51,57 @@ async def create_session(body: SessionCreateIn | None = None) -> SessionCreated:
 
 
 async def _stub_message_stream(session_id: str) -> AsyncIterator[str]:
-    for ev in stubs.stub_trace_events(session_id):
+    for ev in stubs.stub_turn_events(session_id):
         yield sse("trace", ev)
         await asyncio.sleep(0.05)  # simulate streaming latency
     final: FinalEvent = stubs.stub_final(session_id)
     yield sse("final", final)
+    # The picture follows the reply, as it does from the real illustrator.
+    for ev in stubs.stub_drawing_events(session_id):
+        yield sse("trace", ev)
+        await asyncio.sleep(0.05)
+    yield sse("drawing", stubs.stub_drawing())
+
+
+async def _trace_frames(task: asyncio.Task, queue: asyncio.Queue[TraceEvent]) -> AsyncIterator[str]:
+    """Forward trace events as they are written, until the task is done and the queue is empty."""
+    while not (task.done() and queue.empty()):
+        try:
+            yield sse("trace", await asyncio.wait_for(queue.get(), timeout=0.1))
+        except asyncio.TimeoutError:
+            continue
 
 
 async def _message_stream(session_id: str, body: MessageIn) -> AsyncIterator[str]:
-    """Run the turn and forward its trace events as they are written, then the final event."""
+    """Run the turn and forward its trace events as they are written, then the final event.
+
+    A hint coach reply may then get a picture: the illustrator's trace events and one
+    `drawing` event follow `final` on the same stream. The reply never waits for them.
+    """
     queue = store.subscribe(session_id)
-    task = asyncio.create_task(orchestrator.run_turn(session_id, body))
+    tasks: list[asyncio.Task] = [asyncio.create_task(orchestrator.run_turn(session_id, body))]
     try:
-        while not (task.done() and queue.empty()):
-            try:
-                yield sse("trace", await asyncio.wait_for(queue.get(), timeout=0.1))
-            except asyncio.TimeoutError:
-                continue
+        async for frame in _trace_frames(tasks[0], queue):
+            yield frame
         try:
-            yield sse("final", task.result())
+            result = tasks[0].result()
         except orchestrator.TurnError as exc:
             yield sse("error", {"message": str(exc), "trace_id": exc.trace_id})
+            return
+        yield sse("final", result.final)
+        if result.sketch is None:
+            return
+        tasks.append(asyncio.create_task(orchestrator.illustrate(result.sketch)))
+        async for frame in _trace_frames(tasks[1], queue):
+            yield frame
+        drawing = tasks[1].result()
+        if drawing is not None:
+            yield sse("drawing", drawing)
     finally:
         store.unsubscribe(session_id, queue)
-        if not task.done():
-            task.cancel()
+        for task in tasks:
+            if not task.done():
+                task.cancel()
 
 
 @router.post("/{session_id}/message")
