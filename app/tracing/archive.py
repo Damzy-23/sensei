@@ -101,7 +101,7 @@ def totals() -> dict[str, float]:
     tool = read(events.where(filter=FieldFilter("type", "in", ["tool.call", "tool.result"])).count(alias="n"))
     value = {
         "events": int(whole["events"]), "model_calls": int(model["n"]), "tool_calls": int(tool["n"]),
-        "cost_usd": float(whole["cost_usd"] or 0.0),
+        "cost_usd": round(float(whole["cost_usd"] or 0.0), 6),
     }
     _totals = (time.monotonic(), value)
     return value

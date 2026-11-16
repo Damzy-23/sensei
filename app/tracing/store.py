@@ -102,7 +102,9 @@ def totals() -> dict[str, float]:
         "SELECT COUNT(*) AS events, COALESCE(SUM(type = 'llm.call'), 0) AS model_calls, "
         "COALESCE(SUM(type LIKE 'tool%'), 0) AS tool_calls, COALESCE(SUM(cost_usd), 0.0) AS cost_usd FROM events"
     ).fetchone()
-    return dict(row)
+    out = dict(row)
+    out["cost_usd"] = round(float(out.get("cost_usd") or 0.0), 6)  # a sum is only good to the nearest micro-dollar
+    return out
 
 
 def build_tree(events: list[TraceEvent]) -> list[TraceNode]:

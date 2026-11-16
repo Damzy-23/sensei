@@ -70,6 +70,8 @@ def summarise(events: list[TraceEvent]) -> list[ActorSummary]:
         s.tokens_in += ev.tokens_in or 0
         s.tokens_out += ev.tokens_out or 0
         s.cost_usd += ev.cost_usd or 0.0
+    for s in by_actor.values():  # the same events added in another order must give the same total
+        s.cost_usd = round(s.cost_usd, 6)
     return sorted(by_actor.values(), key=lambda s: s.events, reverse=True)
 
 
@@ -78,7 +80,7 @@ def _count(events: list[TraceEvent]) -> Totals:
         events=len(events),
         model_calls=sum(ev.type == "llm.call" for ev in events),
         tool_calls=sum(ev.type.startswith("tool") for ev in events),
-        cost_usd=sum(ev.cost_usd or 0.0 for ev in events),
+        cost_usd=round(sum(ev.cost_usd or 0.0 for ev in events), 6),
     )
 
 
