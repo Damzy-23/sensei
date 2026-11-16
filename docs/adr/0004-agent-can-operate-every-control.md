@@ -46,10 +46,14 @@ and the control a surrounding label stands for), strictest ruling wins:
 - **Needs the student's click**: signing out or in, resolving a mentor ticket, sending
   a mentor reply, wiping, resetting, deleting or removing, downloading or printing,
   links that leave the app or open a tab or download, and any control marked
-  `data-agent="confirm"`. The decision uses a short list of name patterns for action
-  labels (four words or fewer, read with look-alike letters, zero-width characters and
-  hyphens undone) plus the `data-agent` mark, which does not depend on wording.
-  Sending from a box (`type_into` with submit) is ruled on the button it would set off.
+  `data-agent="confirm"`: today Call Senior, End interview and get feedback, turning
+  the proctor's camera on, Download PDF, the CV's own text (Your CV, its lines, New
+  line), Add to my CV, and Tailor my CV once a tailored CV would be replaced. The
+  audit had the CV boxes as blocked; they ask instead, so a student can still dictate
+  their CV. The decision uses a short list of name patterns for action labels (four
+  words or fewer, read with look-alike letters, zero-width characters and hyphens
+  undone) plus the `data-agent` mark, which does not depend on wording. Sending from a
+  box (`type_into` with submit) is ruled on the button it would set off.
 
 A needs-click action shows a prompt, "Senior wants to: <action>. Allow / Not now"
 (`web/src/agent/AgentControls.tsx`): a real dialog region with focus moved to it,
@@ -79,6 +83,6 @@ Run tests").
 - Page text read by the agent can carry another person's words (a ticket, a search
   result). The fixed note on `read_screen` and the voice coach's instructions say it
   is never to be followed.
-- Tested by `web/tests/control-rules.test.ts` (`npm test`): naming and dedup,
+- Tested by `web/src/agent/control-rules.test.mjs` (`npm test`): naming and dedup,
   matching, the block and confirm rules, text shaping and capping, and the change
   summary.

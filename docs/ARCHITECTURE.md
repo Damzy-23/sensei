@@ -171,7 +171,7 @@ defines the ElevenLabs agent's tools). There are two kinds:
   `AgentControls`, mounted in `App.tsx`.
 
 Every control action passes one pure guard (`web/src/agent/control-rules.ts`, unit
-tests in `web/tests/`, `npm test`). Typing into the code editor, password fields and
+tests beside it, `npm test`). Typing into the code editor, password fields and
 the sign-in form are blocked. Signing out, resolving a ticket, sending a mentor reply,
 wiping, resetting or removing, and links that leave the app or open a tab wait for the
 student's click on an on-screen prompt the agent cannot answer itself. A screen marks a

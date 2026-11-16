@@ -179,7 +179,7 @@ export function Proctor(props: { sessionId: string | null }) {
           </span>
         )}
         <button type="button" role="switch" aria-checked={on} aria-labelledby={titleId} className="proctor-switch"
-          disabled={!sessionId} onClick={toggle}>
+          disabled={!sessionId} onClick={toggle} data-agent={on ? undefined : "confirm"}>
           <span className="proctor-track" aria-hidden="true"><i /></span>
           <span>{on ? "On" : "Off"}</span>
         </button>

@@ -62,7 +62,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 cp .env.example .env          # add ANTHROPIC_API_KEY, set SENSEI_USE_STUBS=0
 .venv/bin/uvicorn app.main:app --reload --port 8000
 .venv/bin/python -m pytest -q
-(cd web && npm ci && npm test)   # the control layer's rules (web/tests/)
+(cd web && npm ci && npm test)   # the web app's pure rules: proctor and control layer
 ```
 
 With `SENSEI_USE_STUBS=1` (the default) the API serves fixed sample data and needs no key.

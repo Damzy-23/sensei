@@ -1,15 +1,16 @@
-// Unit tests for the control layer's pure rules (src/agent/control-rules.ts).
-// Run with `npm test` (node --test, types stripped by Node itself; no test framework).
+// The control layer's pure rules (control-rules.ts): naming and dedup, matching, the block and
+// confirm rules, text shaping and capping, and the change summary. Run: npm test
 
-import { test } from "node:test";
 import assert from "node:assert/strict";
-import {
+import { test } from "node:test";
+import { loadTs } from "../proctor/load-ts.mjs";
+
+const {
   NOT_INSTRUCTIONS, PRE_END, PRE_START, SOFT, askText, capText, changedPart, composeText, describeChange, guardText, matchName, normalize, rule,
   shorten, strictest, uniqueNames,
-} from "../src/agent/control-rules.ts";
-import type { ControlFacts, Snapshot } from "../src/agent/control-rules.ts";
+} = await loadTs(new URL("./control-rules.ts", import.meta.url));
 
-const facts = (over: Partial<ControlFacts> = {}): ControlFacts => ({
+const facts = (over = {}) => ({
   name: "Run tests", kind: "button", agent: null, password: false, signIn: false, codeEditor: false, link: null, ...over,
 });
 
@@ -144,7 +145,7 @@ test("typing into the code editor is blocked and points to write_line", () => {
 test("password fields and the sign-in form are blocked, even for scrolling", () => {
   assert.equal(rule(facts({ name: "Password", kind: "field", password: true }), "type").verdict, "block");
   assert.equal(rule(facts({ name: "Password", kind: "field", password: true }), "scroll").verdict, "block");
-  for (const action of ["press", "type", "pick"] as const) {
+  for (const action of ["press", "type", "pick"]) {
     assert.equal(rule(facts({ name: "Email", kind: "field", signIn: true }), action).verdict, "block", action);
   }
   assert.equal(rule(facts({ name: "Create account", signIn: true }), "press").verdict, "block");
@@ -183,7 +184,7 @@ test("an option named like a needs-click action asks before it is picked", () =>
 });
 
 test("links that leave the app, open a tab or download ask; links inside the app do not", () => {
-  const link = (l: ControlFacts["link"]) => facts({ name: "Example", kind: "link", link: l });
+  const link = (l) => facts({ name: "Example", kind: "link", link: l });
   assert.equal(rule(link({ stays: true, newTab: false, download: false }), "press").verdict, "allow");
   assert.equal(rule(link({ stays: false, newTab: false, download: false }), "press").verdict, "confirm");
   assert.equal(rule(link({ stays: true, newTab: true, download: false }), "press").verdict, "confirm");
@@ -260,7 +261,7 @@ test("the not-instructions note is fixed", () => {
 // ---------------------------------------------------------------------------------------------
 // What changed
 
-const snap = (over: Partial<Snapshot> = {}): Snapshot => ({ screen: "Workspace", heading: "Two Sum", dialog: null, controls: [], notices: [], ...over });
+const snap = (over = {}) => ({ screen: "Workspace", heading: "Two Sum", dialog: null, controls: [], notices: [], ...over });
 
 test("a screen change is reported first", () => {
   const line = describeChange(snap(), snap({ screen: "Learn path", heading: "Patterns, one at a time" }));
