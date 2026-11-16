@@ -20,7 +20,9 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from app import stubs
 from app.config import get_settings
 from app.memory import repository as memory
-from app.tracing.context import span, turn
+from app.models import TraceEvent
+from app.tracing import store
+from app.tracing.context import new_id, now_iso
 
 router = APIRouter(prefix="/sessions", tags=["proctor"])
 
@@ -126,7 +128,13 @@ async def record_reminder(session_id: str, request: Request) -> ProctorEventOut:
     check = CHECKS[body.rule]
     held = f"for {body.seconds:.1f} s"
     reason = f"{check.seen} {held}"
-    with turn(session_id, name="proctor") as trace:
-        with span("proctor", "guard.input", check.name, f"{body.rule} {held}") as st:
-            st.decision, st.reason, st.output = check.decision, reason, check.said
-    return ProctorEventOut(trace_id=trace.trace_id, decision=check.decision, reason=reason)
+    # One event per reminder, not a whole turn: a reminder every 20 s must not push the student's
+    # real turns out of the inspector's replay or fill the activity log with turn.start and turn.end.
+    trace_id = new_id("trc")
+    store.emit(TraceEvent(
+        event_id=new_id("evt"), trace_id=trace_id, span_id=new_id("spn"), parent_span_id=None,
+        session_id=session_id, seq=0, ts=now_iso(), actor="proctor", type="guard.input", name=check.name,
+        status="ok", latency_ms=None, model=None, tokens_in=None, tokens_out=None, cost_usd=None,
+        input=f"{body.rule} {held}", output=check.said, decision=check.decision, reason=reason,
+    ))
+    return ProctorEventOut(trace_id=trace_id, decision=check.decision, reason=reason)

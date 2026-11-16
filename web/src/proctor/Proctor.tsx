@@ -13,7 +13,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useApp } from "../app-context";
 import { loadDetector, type Detector } from "./detector";
 import { reportReminder } from "./remote";
-import { PROMPT_GAP_MS, start, step, type Reading, type Reminder } from "./rules";
+import { PROMPT_GAP_MS, TYPING_MS, start, step, type Reading, type Reminder } from "./rules";
 import { createVoice } from "./voice";
 
 /** One detector runs per tick, face and hands in turn, so each samples about 5 times a second
@@ -47,7 +47,8 @@ function Check({ label, ok, value }: { label: string; ok: boolean | null; value:
   );
 }
 
-export function Proctor({ sessionId }: { sessionId: string | null }) {
+export function Proctor(props: { sessionId: string | null }) {
+  const sessionId = props.sessionId;
   const { page } = useApp();
   const [on, setOn] = useState(false);
   const [phase, setPhase] = useState<Phase>("asking");
@@ -86,6 +87,9 @@ export function Proctor({ sessionId }: { sessionId: string | null }) {
     };
 
     let state = start(performance.now());
+    let typedAt = -Infinity;
+    const onKey = () => { typedAt = performance.now(); };
+    window.addEventListener("keydown", onKey, true);
     let facing: boolean | null = null;
     let hands: number | null = null;
     let ticks = 0;
@@ -102,7 +106,7 @@ export function Proctor({ sessionId }: { sessionId: string | null }) {
         return;
       }
       if (facing === null || hands === null) return;
-      const seen: Reading = { facing, hands };
+      const seen: Reading = { facing, hands, typing: now - typedAt < TYPING_MS };
       setReading((old) => (old && old.facing === seen.facing && old.hands === seen.hands ? old : seen));
       const next = step(state, seen, now);
       state = next.state;
@@ -140,6 +144,7 @@ export function Proctor({ sessionId }: { sessionId: string | null }) {
       detector = loaded;
       state = start(performance.now());
       setPhase("running");
+      voice.warm();
       document.addEventListener("visibilitychange", onVisibility);
       sample();
     })();
@@ -147,6 +152,7 @@ export function Proctor({ sessionId }: { sessionId: string | null }) {
     return () => {
       stopped = true;
       document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("keydown", onKey, true);
       pause();
       window.clearTimeout(bannerTimer);
       voice.close();

@@ -22,6 +22,10 @@ export const LIMIT_MS: Record<Rule, number> = { eyes_off_screen: 3000, hands_not
 export const GRACE_MS = 3000;
 /** The same reminder is not repeated within this time. */
 export const COOLDOWN_MS = 20_000;
+/** Hands are reminded less often: on a laptop the keyboard is often just below the camera. */
+export const HANDS_COOLDOWN_MS = 60_000;
+/** Typing in the last this many ms means the hands are on the keyboard: no hands reminder. */
+export const TYPING_MS = 4000;
 /** How long one reminder owns the banner and the voice. No other reminder starts inside it. */
 export const PROMPT_GAP_MS = 6000;
 /** A condition has cleared once it has been fine for this long. One good frame in the middle
@@ -41,6 +45,8 @@ export interface Reading {
   facing: boolean;
   /** How many hands are in view: 0, 1 or 2. */
   hands: number;
+  /** The candidate typed within the last TYPING_MS. Their hands are on the keyboard, out of view. */
+  typing?: boolean;
 }
 
 interface Watch {
@@ -91,7 +97,7 @@ function observe(watch: Watch, holds: boolean, now: number): Watch {
 /** Take one reading. Returns the next state and the reminder to give now, if any. */
 export function step(previous: ProctorState, reading: Reading, now: number): { state: ProctorState; reminder: Reminder | null } {
   const state = previous.lastAt !== null && now - previous.lastAt > STALL_MS ? resume(previous, now) : previous;
-  const holds: Record<Rule, boolean> = { eyes_off_screen: !reading.facing, hands_not_visible: reading.hands < 2 };
+  const holds: Record<Rule, boolean> = { eyes_off_screen: !reading.facing, hands_not_visible: reading.hands < 2 && !reading.typing };
   const watch: Record<Rule, Watch> = {
     eyes_off_screen: observe(state.watch.eyes_off_screen, holds.eyes_off_screen, now),
     hands_not_visible: observe(state.watch.hands_not_visible, holds.hands_not_visible, now),
@@ -106,7 +112,7 @@ export function step(previous: ProctorState, reading: Reading, now: number): { s
     const { since, remindedAt } = watch[rule];
     if (!holds[rule]) continue; // it looks fine right now: never remind someone who has just looked back
     if (since === null || now - since <= LIMIT_MS[rule]) continue;
-    if (remindedAt !== null && now - remindedAt < COOLDOWN_MS) continue;
+    if (remindedAt !== null && now - remindedAt < (rule === "hands_not_visible" ? HANDS_COOLDOWN_MS : COOLDOWN_MS)) continue;
     return {
       state: { ...next, lastReminderAt: now, watch: { ...watch, [rule]: { ...watch[rule], remindedAt: now } } },
       reminder: { rule, text: PROMPTS[rule], seconds: Math.round((now - since) / 100) / 10 },

@@ -49,8 +49,8 @@ def test_a_reminder_is_recorded_with_its_decision_and_reason(client: TestClient)
     assert body["reason"] == "no face facing the screen for 3.4 s"
 
     events = store.load_trace(body["trace_id"])
-    assert [e.type for e in events] == ["turn.start", "guard.input", "turn.end"]
-    reminder = events[1]
+    assert [e.type for e in events] == ["guard.input"]  # one event per reminder, not a whole turn
+    reminder = events[0]
     assert reminder.actor == "proctor" and reminder.name == "eyes_check" and reminder.status == "ok"
     assert reminder.session_id == sid
     assert reminder.decision == "reminded: eyes"
@@ -64,7 +64,7 @@ def test_the_hands_rule_has_its_own_decision_and_reason(client: TestClient) -> N
     body = _post(client, sid, {"rule": "hands_not_visible", "seconds": 5}).json()
     assert body["decision"] == "reminded: hands"
     assert body["reason"] == "fewer than two hands in view for 5.0 s"
-    reminder = store.load_trace(body["trace_id"])[1]
+    reminder = store.load_trace(body["trace_id"])[0]
     assert reminder.name == "hands_check" and reminder.output == "Let me see both hands, please."
 
 
@@ -164,7 +164,7 @@ def test_stub_mode_records_reminders_too(tmp_path, monkeypatch) -> None:
         sid = client.post("/sessions", json={"mode": "interview"}).json()["session_id"]
         r = _post(client, sid, {"rule": "hands_not_visible", "seconds": 6.25})
         assert r.status_code == 201 and r.json()["reason"] == "fewer than two hands in view for 6.2 s"
-        assert store.load_trace(r.json()["trace_id"])[1].actor == "proctor"
+        assert store.load_trace(r.json()["trace_id"])[0].actor == "proctor"
         assert _post(client, "ses_missing", {"rule": "hands_not_visible", "seconds": 6}).status_code == 404
     finally:
         proctor.reset_rate_limit()

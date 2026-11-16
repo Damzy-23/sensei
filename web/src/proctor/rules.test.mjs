@@ -121,9 +121,9 @@ test("two reminders never arrive together", () => {
   for (let i = 1; i < reminders.length; i += 1) {
     assert.ok(reminders[i].at - reminders[i - 1].at >= PROMPT_GAP_MS, `${reminders[i - 1].at} then ${reminders[i].at}`);
   }
-  // Eyes first; hands wait until the banner is free; each keeps its own 20 s cooldown.
+  // Eyes first; hands wait until the banner is free. Eyes repeat every 20 s, hands only every 60 s.
   assert.deepEqual(reminders.slice(0, 4).map((r) => [r.rule, r.at]), [
-    ["eyes_off_screen", 3100], ["hands_not_visible", 9100], ["eyes_off_screen", 23_100], ["hands_not_visible", 29_100],
+    ["eyes_off_screen", 3100], ["hands_not_visible", 9100], ["eyes_off_screen", 23_100], ["eyes_off_screen", 43_100],
   ]);
 });
 
@@ -175,4 +175,24 @@ test("step does not change the state it is given", () => {
   const frozen = JSON.stringify(state);
   step(state, GONE, 5000);
   assert.equal(JSON.stringify(state), frozen);
+});
+
+
+test("hands-first: a pause still keeps the gap after the last reminder", () => {
+  // Settle, hold "no hands" until a reminder, pause, then resume with the face gone.
+  let s = start(0);
+  let hands = null;
+  for (let t = 3000; t <= 10000; t += 200) s = step(s, { facing: true, hands: 2 }, t).state;
+  for (let t = 10000; t <= 16000; t += 200) { const r = step(s, { facing: true, hands: 0 }, t); s = r.state; if (r.reminder) hands = t; }
+  assert.ok(hands !== null, "a hands reminder fired");
+  let eyes = null;
+  for (let t = 17200; t <= 30000; t += 200) { const r = step(s, { facing: false, hands: 2 }, t); s = r.state; if (r.reminder && eyes === null) eyes = t; }
+  assert.ok(eyes === null || eyes - hands >= PROMPT_GAP_MS, `eyes reminder at ${eyes} came ${eyes - hands} ms after hands`);
+});
+
+test("no hands reminder while typing", () => {
+  let s = start(0);
+  let fired = false;
+  for (let t = 3000; t <= 20000; t += 200) { const r = step(s, { facing: true, hands: 0, typing: true }, t); s = r.state; fired ||= Boolean(r.reminder); }
+  assert.equal(fired, false);
 });
