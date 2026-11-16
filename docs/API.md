@@ -14,6 +14,7 @@ Run: `uvicorn app.main:app --reload --port 8000`
 ## Conventions
 
 - Errors: `404 {"detail": "..."}` for unknown ids; `422` for invalid bodies (FastAPI standard).
+- `503 {"detail": "..."}` with `Retry-After: 5` when a session or ticket is not in the running server and its stored copy could not be read just now (after a deploy, while Firestore is not answering). It may exist: try again, do not treat it as `404`.
 - Ids: `ses_*` sessions, `trc_*` traces, `tkt_*` tickets, `msg_*` chat messages, `evt_*` events.
 - Timestamps: ISO 8601 UTC strings.
 - **Never returned by any endpoint:** reference solutions, hidden tests, or the internal prompts.

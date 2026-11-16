@@ -5,7 +5,9 @@ rest of the app reads or writes memory, so the store can change without touching
 
 SQLite starts empty on every deploy, so each write is also mirrored to a durable copy
 (app.memory.durable). When a session or ticket is asked for and SQLite does not have it,
-it is copied back in from there and reads carry on from SQLite.
+it is copied back in from there and reads carry on from SQLite. A restore is all or nothing:
+if any part of the copy cannot be read, nothing is written and MemoryUnavailable is raised,
+so the next request restores the session whole.
 """
 
 from __future__ import annotations
@@ -21,11 +23,14 @@ from datetime import datetime, timezone
 
 from app.db import get_conn, write_lock
 from app.memory import durable
+from app.memory.durable import MemoryUnavailable
+
+__all__ = ["MemoryUnavailable"]  # the API answers it with 503; see app.main
 from app.models import ChatActor, ChatMessage, Mode, Ticket, TicketDetail
 
 BLITZ_SECONDS = 600
 RESTORED_TICKETS = 200  # how many of the newest tickets come back into the mentor queue after a restart
-LOOK_AGAIN_SECONDS = 15.0  # how long "the durable copy has no such session" (or could not be read) is believed
+LOOK_AGAIN_SECONDS = 15.0  # how long "the durable copy has no such session or ticket" is believed
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -49,8 +54,7 @@ TICKET_COLUMNS = (
 
 log = logging.getLogger(__name__)
 _tickets_loaded = False  # the mentor queue is filled from the durable copy once per process
-_tickets_tried_at = float("-inf")  # when that was last tried: a failed try is repeated, but not on every request
-_not_in_copy: dict[str, float] = {}  # session id -> when the durable copy was last asked for it and had nothing
+_not_in_copy: dict[str, float] = {}  # session or ticket id -> when the durable copy was last asked for it and had nothing
 
 
 def _now() -> datetime:
@@ -167,8 +171,11 @@ def add_message(session_id: str, actor: ChatActor, text: str, trace_id: str | No
 
 
 def transcript(session_id: str, limit: int = 50) -> list[ChatMessage]:
+    """The newest `limit` messages, oldest first. Ordered by time, then by order of writing: a
+    message can reach SQLite before the older conversation is restored, so rowid alone is not enough."""
     rows = _conn().execute(
-        "SELECT * FROM (SELECT rowid AS r, * FROM messages WHERE session_id = ? ORDER BY rowid DESC LIMIT ?) ORDER BY r",
+        "SELECT * FROM (SELECT rowid AS r, * FROM messages WHERE session_id = ? ORDER BY ts DESC, rowid DESC LIMIT ?)"
+        " ORDER BY ts, r",
         (session_id, limit),
     ).fetchall()
     return [ChatMessage(**{k: row[k] for k in ChatMessage.model_fields}) for row in rows]
@@ -193,7 +200,10 @@ def create_ticket(session: Session, stuck_reason: str, suggested_intervention: s
 
 
 def list_tickets() -> list[Ticket]:
-    _load_tickets()
+    try:
+        _load_tickets()
+    except MemoryUnavailable:
+        pass  # the queue still answers with what SQLite has; the rest comes once the copy answers
     rows = _conn().execute("SELECT * FROM tickets ORDER BY created_at DESC").fetchall()
     return [Ticket(**{k: row[k] for k in Ticket.model_fields}) for row in rows]
 
@@ -208,9 +218,11 @@ def _ticket_row(ticket_id: str) -> sqlite3.Row | None:
     if row is None and durable.enabled():
         _load_tickets()
         row = _find_ticket(ticket_id)
-        if row is None:  # not one of the newest: ask for it by id
+        if row is None and not _believed_missing(ticket_id):  # not one of the newest: ask for it by id
             ticket = durable.fetch_ticket(ticket_id)
-            if ticket is not None and _copy_in(tickets=[ticket]):
+            if ticket is None:
+                _remember_missing(ticket_id)
+            elif _copy_in(tickets=[ticket]):
                 row = _find_ticket(ticket_id)
     return row
 
@@ -224,8 +236,10 @@ def get_ticket(ticket_id: str) -> TicketDetail | None:
 
 
 def resolve_ticket(ticket_id: str) -> Ticket | None:
-    if _ticket_row(ticket_id) is None:  # after a restart this restores the ticket, so there is a row to change
+    row = _ticket_row(ticket_id)  # after a restart this restores the ticket, so there is a row to change
+    if row is None:
         return None
+    _session_row(row["session_id"])  # and its session, before anything is written: this may raise
     with write_lock:
         _conn().execute("UPDATE tickets SET status = 'resolved' WHERE id = ?", (ticket_id,))
         _mirror_ticket(ticket_id)
@@ -243,52 +257,63 @@ def _mirror_ticket(ticket_id: str) -> None:
 # ---------- after a restart: restore from the durable copy ----------
 
 
+# A browser that still holds an id from before the copy existed asks for it every few seconds.
+# Each miss is a network read, so "the copy has no such thing" is believed for a while.
+
+
+def _believed_missing(key: str) -> bool:
+    asked = _not_in_copy.get(key)
+    return asked is not None and time.monotonic() - asked < LOOK_AGAIN_SECONDS
+
+
+def _remember_missing(key: str) -> None:
+    if len(_not_in_copy) >= 5_000:  # never grows without limit
+        _not_in_copy.clear()
+    _not_in_copy[key] = time.monotonic()
+
+
 def _restore_session(session_id: str) -> bool:
     """SQLite has no such session. If the durable copy does, bring it back in one go with its
-    whole transcript and its tickets. True when the session is now in SQLite."""
-    # A browser that still holds a session id from before the copy existed asks for it every few
-    # seconds. Each miss is a network read the whole server waits on, so a miss is believed for a while.
-    asked = _not_in_copy.get(session_id)
-    if asked is not None and time.monotonic() - asked < LOOK_AGAIN_SECONDS:
+    whole transcript and its tickets. True when the session is now in SQLite.
+
+    Raises MemoryUnavailable when any part of the copy could not be read: then nothing is written."""
+    if not durable.enabled() or _believed_missing(session_id):
         return False
     doc = durable.fetch_session(session_id)
     if doc is None:
-        if durable.enabled():
-            if len(_not_in_copy) >= 5_000:  # never grows without limit
-                _not_in_copy.clear()
-            _not_in_copy[session_id] = time.monotonic()
+        _remember_missing(session_id)
         return False
     try:
         # Only the fields Session has today: a copy written by an older version may carry others.
         known = {f.name for f in fields(Session)}
         stored = {k: v for k, v in json.loads(doc["data"]).items() if k in known}
         data = json.dumps(Session(**{**stored, "session_id": session_id}).__dict__)
-    except Exception:  # noqa: BLE001 - a copy that cannot be read is treated as no copy
+    except Exception:  # noqa: BLE001 - a copy that cannot be parsed is treated as no copy
         log.exception("could not read the durable copy of session %s", session_id)
+        _remember_missing(session_id)
         return False
-    return _copy_in(
-        sessions=[(session_id, data)],
-        messages=durable.fetch_messages(session_id),
-        tickets=durable.fetch_tickets(RESTORED_TICKETS, session_id) or [],
-    )
+    messages = durable.fetch_messages(session_id)  # both read before anything is written
+    tickets = durable.fetch_tickets(RESTORED_TICKETS, session_id)
+    return _copy_in(sessions=[(session_id, data)], messages=messages, tickets=tickets)
 
 
 def _load_tickets() -> None:
-    """After a restart the mentor queue is empty: fill it from the durable copy, once per process."""
-    global _tickets_loaded, _tickets_tried_at
-    if _tickets_loaded or not durable.enabled() or time.monotonic() - _tickets_tried_at < LOOK_AGAIN_SECONDS:
+    """After a restart the mentor queue is empty: fill it from the durable copy, once per process.
+    A failed read raises MemoryUnavailable and is tried again on a later call."""
+    global _tickets_loaded
+    if _tickets_loaded or not durable.enabled():
         return
-    _tickets_tried_at = time.monotonic()
-    tickets = durable.fetch_tickets(RESTORED_TICKETS)
-    if tickets is not None and _copy_in(tickets=tickets):  # None: the read failed, so it is tried again later
+    if _copy_in(tickets=durable.fetch_tickets(RESTORED_TICKETS)):
         _tickets_loaded = True
 
 
 def reset_restore_state() -> None:
-    """Forget what this process has already loaded from the durable copy. Tests use it to act out a restart."""
-    global _tickets_loaded, _tickets_tried_at
-    _tickets_loaded, _tickets_tried_at = False, float("-inf")
+    """Forget what this process has already loaded from the durable copy, and past failures.
+    Tests use it to act out a restart."""
+    global _tickets_loaded
+    _tickets_loaded = False
     _not_in_copy.clear()
+    durable.reset()
 
 
 def _copy_in(

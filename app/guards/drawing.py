@@ -143,18 +143,25 @@ def decide(raw: Any, hint_level: int | None = None, pattern: str = "") -> Drawin
 
     # Not more than the hint level allows (mirrors the ladder in app/prompts/hint_coach.md).
     if hint_level is not None:
-        words = [texts["title"], texts["caption"], *labels] + (cells if kind in ("steps", "array") else [])
-        if hint_level < 2 and pattern and any(_mentions(t, pattern) for t in words):
-            return _blocked("drawing.level", f"names the pattern ({pattern}) before hint level 2")
+        # Before hint 2 the pattern is not named. In the caption or title it is dropped (the picture
+        # still goes up); in the drawing itself the picture is dropped.
+        renamed = []
+        if hint_level < 2 and pattern:
+            if any(_mentions(t, pattern) for t in [*labels] + (cells if kind in ("steps", "array") else [])):
+                return _blocked("drawing.level", f"names the pattern ({pattern}) before hint level 2")
+            for field in ("title", "caption"):
+                if _mentions(texts[field], pattern):
+                    texts[field] = ""
+                    renamed.append(f"{field} removed (it named the pattern)")
         # Below level 4 the picture is trimmed rather than dropped, so the student still gets one:
         # pointers and water stay only at the two ends (the starting state, not an answer), and a
         # plan keeps its first two steps (restating the goal), not the way to solve it.
-        if hint_level < 4:
-            trimmed = []
-            if kind == "steps" and len(cells) > 2:
+        if hint_level < 4 or renamed:
+            trimmed = list(renamed)
+            if hint_level < 4 and kind == "steps" and len(cells) > 2:
                 cells = cells[:2]
                 trimmed.append("plan cut to two steps")
-            if kind == "bars":
+            if hint_level < 4 and kind == "bars":
                 ends = {0, len(cells) - 1}
                 pairs = [(int(p.split(":", 1)[0]), p.split(":", 1)[1].strip()) for p in texts["pointers"].split(",") if ":" in p]
                 kept = [(i, name) for i, name in pairs if i in ends]

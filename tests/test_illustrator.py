@@ -557,8 +557,11 @@ def test_level_rules_trim_what_the_hint_does_not_allow_yet() -> None:
     assert decided(plan, 2).drawing.values == ["Start at both ends", "Move the shorter"]
     assert decided(plan, 4).drawing.values == plan["values"]
     named = {"kind": "array", "values": ["2", "7", "11"], "caption": "A Hash Map makes this fast"}
-    assert _blocked_rule(named, hint_level=1, pattern="hash map") == "drawing.level"
-    assert _blocked_rule(named, hint_level=2, pattern="hash map") is None
+    early = _drawing_guard.decide(named, hint_level=1, pattern="hash map")
+    assert early.rule == "drawing.level_trimmed" and early.drawing.caption == ""
+    assert _drawing_guard.decide(named, hint_level=2, pattern="hash map").drawing.caption == named["caption"]
+    in_cells = {"kind": "steps", "values": ["Use a hash map"], "title": ""}
+    assert _blocked_rule(in_cells, hint_level=1, pattern="hash map") == "drawing.level"
 
 
 def test_prose_only_drops_code_in_backticks_in_any_form() -> None:
