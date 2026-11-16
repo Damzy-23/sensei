@@ -22,6 +22,7 @@ Actor = Literal[
     "job_analyst",
     "cv_writer",
     "hint_coach",
+    "illustrator",
     "evaluator",
     "planner",
     "mentor",
@@ -47,6 +48,7 @@ EventStatus = Literal["ok", "blocked", "error", "retried"]
 NextAction = Literal["keep_coding", "ask_for_hint", "review_complexity", "escalate"]
 ChatActor = Literal["student", "coach", "mentor"]
 TicketStatus = Literal["open", "resolved"]
+DrawingKind = Literal["bars", "grid", "tree", "graph", "array", "steps"]
 
 
 # ---------- problems ----------
@@ -137,6 +139,29 @@ class FinalEvent(BaseModel):
     hint_level: int = Field(ge=0, le=5)
     escalated: bool
     trace_id: str
+    # True when a picture for this reply is being drawn and may follow as a `drawing` event.
+    drawing_coming: bool = False
+
+
+class Drawing(BaseModel):
+    """One picture for the glass, sent after `final` when the coach's reply has one (event name: drawing).
+
+    The text fields use the formats the glass tools already take, so the browser can hand
+    them straight to glass_array, glass_steps or glass_3d. Only app.guards.drawing builds one:
+    it holds the size limits and the no-code rule.
+    """
+
+    kind: DrawingKind
+    values: list[str] = Field(
+        description="bars, array: the cells. grid: one string per row, like 1,1,0. "
+        "tree: level order, null for a gap. graph: one label per node. steps: one step each, in words."
+    )
+    pointers: str = Field(default="", description="bars, array: labels by index, like 0:left,4:right.")
+    water: str = Field(default="", description="bars: water between two indices, like 1-8.")
+    highlight: str = Field(default="", description="Indices to light up, like 2,3. For grid, row:column pairs like 0:1.")
+    edges: str = Field(default="", description="graph: edges by node index, like 0-1,1-2.")
+    title: str = Field(default="", description="steps: a short heading.")
+    caption: str = Field(default="", description="One short sentence under the picture. Never code.")
 
 
 class Failure(BaseModel):

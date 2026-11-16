@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import {
   ApiError, getMentorMessages, getProblem, getState, getTrace, getTrack, postRun, sendMessage,
-  type Mode, type Problem, type ProblemDetail, type SessionState, type TraceNode,
+  type Drawing, type Mode, type Problem, type ProblemDetail, type SessionState, type TraceNode,
 } from "../api";
-import { registerTool, type PageSnapshot } from "../agent/tools";
+import { drawWithoutRaising } from "../agent/Glass";
+import { invoke, registerTool, type PageSnapshot } from "../agent/tools";
 import { MODE_COLOR, useApp } from "../app-context";
 import { entryPoint, runCode, runTests, type TestResult } from "../runner";
 import { CodeEditor, RichText } from "../components/CodeEditor";
@@ -77,6 +78,26 @@ function withLineAdded(source: string, line: string, after: number | null): { so
 
 const clock = (seconds: number) => `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
 
+// Below this width the glass would cover the reply it illustrates, so a typed reply's picture
+// goes onto the glass without raising it, and the "Glass" tab shows instead.
+const RAISE_MIN_WIDTH = 1100;
+
+/** Put the illustrator's picture on the glass through the page tools, so it shows in the
+ *  "Senior is doing" feed and obeys the glass's own limits. Returns what was drawn, in words
+ *  the voice agent can read, or null if the glass refused it. */
+async function drawOnGlass(d: Drawing, voice: boolean): Promise<string | null> {
+  // In a voice call the picture is Senior's own act, shown in the feed; in typed chat it is part of the reply.
+  const quiet = !voice;
+  const put = async () =>
+    d.kind === "array" ? invoke("glass_array", { values: d.values, pointers: d.pointers, caption: d.caption }, { quiet })
+    : d.kind === "steps" ? invoke("glass_steps", { title: d.title, steps: d.values }, { quiet })
+    : invoke("glass_3d", { scene: d.kind, values: d.values, pointers: d.pointers, water: d.water, highlight: d.highlight, edges: d.edges, caption: d.caption }, { quiet });
+  const drawn = !voice && window.innerWidth < RAISE_MIN_WIDTH ? await drawWithoutRaising(put) : await put();
+  if (!drawn.ok) return null;
+  const about = d.kind === "steps" ? d.title : d.caption;
+  return `Already on the glass for this reply: ${d.kind}${about ? `. ${about}` : ""}`;
+}
+
 export function Workspace() {
   const { page, go, mode, setMode, sessionId, problemId, openProblem } = useApp();
   const [loaded, setLoaded] = useState<Loaded>({ status: "loading" });
@@ -148,22 +169,41 @@ export function Workspace() {
   const lastCoachBubble = [...bubbles].reverse().find((b) => b.kind === "coach");
   const offeredLine = lastCoachBubble ? offeredLineIn(lastCoachBubble.text) : null;
 
-  const ask = useCallback(async (text: string) => {
+  // Where the student is now, read by work that finishes later: a picture belongs to the
+  // session, the problem and the question it was drawn for.
+  const now = useRef({ sessionId, problemId, page });
+  now.current = { sessionId, problemId, page };
+  const asked = useRef(0);
+
+  const ask = useCallback(async (text: string, voice = false) => {
     if (!sessionId) throw new Error("The session is not ready yet.");
     say("student", text, "You");
     setBusy("Reading your message…");
     let steps = 0;
+    const turn = ++asked.current;
+    // The picture follows the reply. `drew` settles once: what went on the glass, or null for no picture.
+    let settle: (drew: string | null) => void = () => undefined;
+    const drew = new Promise<string | null>((resolve) => { settle = resolve; });
     try {
       const final = await sendMessage(sessionId, { text, problem_id: problemId, code }, (event) => {
         steps += 1;
         setBusy(`${event.actor.replace(/_/g, " ")} · ${event.name.replace(/_/g, " ")} · step ${steps}`);
+      }, (drawing) => {
+        // A picture for an old turn must not land on a new problem, a new mode or a newer question.
+        // Nor on another screen: the Workspace stays mounted while the student is elsewhere.
+        const current = turn === asked.current && now.current.sessionId === sessionId && now.current.problemId === problemId
+          && now.current.page === "workspace";
+        if (drawing && current) drawOnGlass(drawing, voice).then(settle, () => settle(null));
+        else settle(null);
       });
       const who = final.mode === "learn" ? "Coach" : "Interviewer";
       say("coach", final.reply, final.mode === "learn" && final.hint_level > 0 ? `${who} · hint ${final.hint_level} of 5` : who);
       lastTraceId.current = final.trace_id;
       await refresh();
-      return { reply: final.reply, hint_level: final.hint_level, escalated: final.escalated };
+      if (!final.drawing_coming) settle(null);
+      return { reply: final.reply, hint_level: final.hint_level, escalated: final.escalated, drawing_coming: Boolean(final.drawing_coming), drew };
     } catch (err) {
+      settle(null);
       const message = err instanceof Error ? err.message : String(err);
       say("notice", `The coach could not answer: ${message}`);
       throw err;
@@ -207,7 +247,12 @@ export function Workspace() {
       registerTool("navigate", ({ page: next }) => { go(next); return { page: next }; }),
       registerTool("set_mode", ({ mode: next }) => { setMode(next); return { mode: next }; }),
       registerTool("open_problem", ({ problem_id }) => { openProblem(problem_id); return { problem_id }; }),
-      registerTool("ask_coach", ({ text }) => ask(text)),
+      registerTool("ask_coach", async ({ text }) => {
+        // The reply never waits for the picture: the server says at once whether one is on its way.
+        const { drew: _picture, drawing_coming, ...answer } = await ask(text, true);
+        void _picture;
+        return { ...answer, drew: drawing_coming ? "A picture for this reply is going up on the glass now. Do not draw the same thing." : null };
+      }),
       registerTool("run_tests", () => run()),
       registerTool("run_code", () => runCode(code)),
       registerTool("read_code", () => {

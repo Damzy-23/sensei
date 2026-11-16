@@ -23,6 +23,20 @@ const FRESH_MS = 2600;
 const EDITOR_LINE = 22;
 const EDITOR_PAD = 14;
 
+// When false, a drawing goes onto the glass without raising it: the "Glass N" tab shows instead,
+// so the reply the student is reading is not covered. Set only through drawWithoutRaising.
+let raiseOnDraw = true;
+
+/** Run a glass tool so that what it draws does not raise the glass over the page. */
+export async function drawWithoutRaising<T>(draw: () => Promise<T>): Promise<T> {
+  raiseOnDraw = false;
+  try {
+    return await draw();
+  } finally {
+    raiseOnDraw = true;
+  }
+}
+
 export const LOOKS_LIKE_CODE = /```|^\s*(def |for .+ in .+:|while .+:|return\b|import )/m;
 
 /** "0:left,4:right" -> {0: [left], 4: [right]}. Entries that do not parse are dropped. */
@@ -272,14 +286,14 @@ export function Glass() {
       const id = nextId.current++;
       commit([...board.current, make(id)].slice(-MAX_ITEMS));
       setLayer("drawings");
-      raise(id);
+      if (raiseOnDraw) raise(id); else setFreshId(id);
       return { drawn: 1 };
     };
     /** Replace the drawing at `at` with a moved copy, keeping its place on the glass. */
     const redraw = (at: number, updated: Item) => {
       commit([...board.current.slice(0, at), updated, ...board.current.slice(at + 1)]);
       setLayer("drawings");
-      raise(updated.id);
+      if (raiseOnDraw) raise(updated.id); else setFreshId(updated.id);
       return { drawn: 1 };
     };
     const cleanups = [

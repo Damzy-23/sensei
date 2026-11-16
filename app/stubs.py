@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 
 from app.models import (
     ChatMessage,
+    Drawing,
     EvalExample,
     EvalModelStats,
     EvalResults,
@@ -85,10 +86,43 @@ def stub_final(session_id: str) -> FinalEvent:
         hint_level=1,
         escalated=False,
         trace_id=STUB_TRACE_ID,
+        drawing_coming=True,  # the stub stream always follows its reply with a picture
+    )
+
+
+def stub_drawing() -> Drawing:
+    """The picture that goes with stub_final: the problem's own example, nothing the hint has not said."""
+    return Drawing(
+        kind="array", values=["2", "7", "11", "15"], pointers="0:start",
+        caption="One pass over the example list, one number at a time.",
     )
 
 
 def stub_trace_events(session_id: str) -> list[TraceEvent]:
+    """Everything one stub turn records: the reply's steps, then the illustrator's."""
+    return stub_turn_events(session_id) + stub_drawing_events(session_id)
+
+
+def stub_drawing_events(session_id: str) -> list[TraceEvent]:
+    """What follows the reply: illustrator -> drawing guard, in the same trace."""
+    base = dict(trace_id=STUB_TRACE_ID, session_id=session_id, ts=now_iso())
+    return [
+        TraceEvent(event_id="evt_0008", span_id="spn_draw_llm", parent_span_id="spn_draw", seq=8,
+                   actor="illustrator", type="llm.call", name="llm_illustrate", status="ok",
+                   model="claude-haiku-5-5", latency_ms=420.0, tokens_in=520, tokens_out=90,
+                   cost_usd=0.00097, input="level=1 problem=two-sum", output='{"kind":"array"}', **base),
+        TraceEvent(event_id="evt_0009", span_id="spn_draw", parent_span_id="spn_root", seq=9,
+                   actor="illustrator", type="agent.start", name="illustrator", status="ok",
+                   decision="drew array", reason="model: the hint is about scanning the list, so show the list",
+                   latency_ms=424.0, output="drew array", **base),
+        TraceEvent(event_id="evt_0010", span_id="spn_draw_check", parent_span_id="spn_root", seq=10,
+                   actor="guard", type="guard.output", name="drawing_check", status="ok",
+                   decision="pass", reason="rule drawing.ok: array with 4 values, within the glass limits, no code",
+                   latency_ms=0.4, **base),
+    ]
+
+
+def stub_turn_events(session_id: str) -> list[TraceEvent]:
     """A short realistic turn: guard -> mode -> hint coach -> output guard."""
     t = now_iso()
     base = dict(trace_id=STUB_TRACE_ID, session_id=session_id, ts=t)

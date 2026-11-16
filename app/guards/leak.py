@@ -82,6 +82,65 @@ def decide(reply: str, allowed_code_lines: int = 0) -> LeakDecision:
     return LeakDecision(False, "leak.none", "rule leak.none: no code in the reply", 0)
 
 
+# Code inside a sentence: anything in backticks, an assignment or equality test on a name, a call
+# (but not O(n), nor a plural like "number(s)"), a subscript on a name.
+_CODE_IN_TEXT = re.compile(
+    r"`"
+    r"|\b[A-Za-z_]\w*(\[[^\]]*\])?\s*(\+=|-=|\*=|/=|//=|%=|\*\*=|&=|\|=|\^=|>>=|<<=|:=|==|!=|=)\s*\S"
+    r"|\b(?!O\()[A-Za-z_][\w.]*\((?!s\))"
+    r"|\b[A-Za-z_]\w*\[[^\]]*\]"
+    r"|\+\+|--\s*[A-Za-z_]|[A-Za-z_]\w*\s*--"
+    # Statements written anywhere in the text, not only at the start of a line.
+    r"|\b(if|elif|while)\b[^:]{0,60}:\s*\S"
+    r"|\bfor\b[^:]{0,60}\bin\b[^:]{0,60}:"
+    r"|\b(else|try|finally)\s*:"
+    r"|:\s*(return|yield|break|continue|pass|raise)\b"
+    r"|\blambda\b[^:]{0,40}:"
+    r"|\bfrom\s+[\w.]+\s+import\b|\bimport\s+[\w.]+"
+    r"|\[[^\]]*\bfor\b[^\]]*\bin\b"
+    r"|\breturn\s+\S"
+    r"|\b(def|class)\s+[A-Za-z_]",
+    re.IGNORECASE,
+)
+
+
+def is_code(text: str) -> bool:
+    """True when a short text (a label, a caption, one step) holds any code at all.
+
+    Stricter than `decide` on purpose. A reply of several sentences may hold one code-like
+    line, and one line of code when the rules allow it. A drawing may hold none, ever: that
+    line belongs in the reply, where it is counted, not on the glass.
+    """
+    return bool(_CODE_IN_TEXT.search(text)) or any(_CODE_LINE.match(line) for line in text.splitlines())
+
+
+def prose_only(reply: str) -> str:
+    """The reply with its code taken out: fenced blocks, and every line `decide` counts as code.
+
+    For a reader that must not repeat the code, such as the illustrator.
+    """
+    kept: list[str] = []
+    in_fence = False
+    for raw in reply.splitlines():
+        given, prose_like, fence = _count(raw)
+        if fence:
+            # A block that opens and closes on one line gives its code there; any other fence line opens or closes one.
+            in_fence = in_fence if given else not in_fence
+            continue
+        if in_fence or given or prose_like:
+            continue
+        # Code in backticks inside a sentence, or with a full stop or a note after it, is taken out too.
+        line = _BACKTICKED.sub(lambda m: "" if is_code(m.group(1)) or len(m.group(1)) > 24 else m.group(0), raw)
+        if _BARE.fullmatch(line):
+            continue
+        kept.append(line)
+    return "\n".join(kept).strip()
+
+
+_BACKTICKED = re.compile(r"`([^`]+)`")
+_BARE = re.compile(r"[\s.,;:!?()\-*>]*")
+
+
 def check(reply: str, allowed_code_lines: int = 0) -> LeakDecision:
     with span("guard", "guard.output", "leak_check", reply) as st:
         decision = decide(reply, allowed_code_lines)

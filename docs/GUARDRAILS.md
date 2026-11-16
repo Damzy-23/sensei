@@ -39,6 +39,24 @@ test that stops it. Rows marked *not enforced yet* are rules we follow by review
 | Show the candidate code in a note or in the feedback | Drop the note; withhold the feedback | `leak.keep_safe_notes`; `test_a_note_containing_code_is_dropped_before_the_candidate_sees_it`, `test_feedback_containing_code_is_withheld` |
 | Let a note name the technique that solves it | The observer describes behaviour only | The observer's prompt. *Not enforced beyond the code check* |
 
+## Pictures on the glass
+
+After a hint coach reply the illustrator draws one picture without being asked. Its drawing
+is checked by rule before it leaves the server (`app/guards/drawing.py`): the kind, the sizes
+the glass can show, the pointer, water, highlight and edge formats, and no code in any value,
+label, title or caption. A drawing that breaks a rule is dropped, not rewritten, and the
+trace records it as blocked with the rule that fired.
+
+| Don't | Do | Enforced by |
+|---|---|---|
+| Put code on the glass | The same patterns as the leak check, and stricter: a drawing may hold no code at all, not even the one line a reply may give | `leak.is_code`, rule `drawing.code`; `tests/test_illustrator.py::test_a_drawing_with_code_anywhere_is_blocked`, `test_a_drawing_that_repeats_the_coachs_line_of_code_is_blocked` |
+| Show the illustrator code it must not repeat | It is handed the reply in words; a line of code in it is left out | `leak.prose_only`; `test_a_line_of_code_stays_in_the_reply_and_is_not_shown_to_the_illustrator` |
+| Draw more than the glass can show | 16 cells, 31 nodes, 6 steps, 8 rows of 12, a 160 character caption | Rule `drawing.size`; `test_an_oversize_drawing_is_blocked` |
+| Make the student wait for a picture, or lose the reply to one | The reply is sent first; the illustrator has 8 seconds and its failure ends nothing | `test_final_is_sent_before_the_illustrator_has_answered`, `test_a_failing_illustrator_still_yields_a_normal_final_reply`, `test_a_slow_illustrator_is_cut_off_and_the_stream_just_closes` |
+| Draw for an interview, a blocked message or a hand-over to a mentor | Only the hint coach's own words get a picture | `test_only_learn_mode_draws`, `test_a_blocked_message_gets_no_drawing`, `test_the_reply_that_hands_over_to_a_mentor_gets_no_drawing` |
+| Draw the solution, or a step past the hint level | The illustrator's role forbids it, and it is never given the problem statement or a solution | `app/prompts/illustrator.md`. *Not enforced beyond the code check* |
+| Follow instructions in the student's message | The message and code are marked as data; a blocked message never reaches the illustrator | The role file; `test_a_blocked_message_gets_no_drawing` |
+
 ## The CV studio
 
 | Don't | Do | Enforced by |

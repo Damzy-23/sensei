@@ -17,7 +17,15 @@ export interface TraceEvent {
   latency_ms: number | null; model: string | null; tokens_in: number | null; tokens_out: number | null;
   cost_usd: number | null; input: string | null; output: string | null; decision: string | null; reason: string | null;
 }
-export interface FinalEvent { reply: string; mode: Mode; hint_level: number; escalated: boolean; trace_id: string }
+export interface FinalEvent { reply: string; mode: Mode; hint_level: number; escalated: boolean; trace_id: string; drawing_coming?: boolean }
+export type DrawingKind = "bars" | "grid" | "tree" | "graph" | "array" | "steps";
+/** One picture for the glass, sent after the reply when it has one. Mirrors Drawing in app/models.py:
+ *  the text fields are in the formats the glass tools take (pointers "0:left,4:right", water "1-8",
+ *  highlight "2,3" or "0:1" for a grid, edges "0-1,1-2"). `title` is for steps only. */
+export interface Drawing {
+  kind: DrawingKind; values: string[]; pointers: string; water: string; highlight: string; edges: string;
+  title: string; caption: string;
+}
 export interface SessionState {
   session_id: string; problem_id: string | null; mode: Mode; hint_level: number; failed_runs: number;
   hints_used: number; time_on_problem: number; mastery: Record<string, number>; escalated: boolean;
@@ -148,12 +156,63 @@ export const answerProfile = (profileId: string, text: string, sessionId: string
 export const recommendRoles = (profileId: string, sessionId: string | null) =>
   post<ProfileResult>(`/profile/${profileId}/recommend${sessionQuery(sessionId)}`);
 
-/** Send a student message. Trace events arrive through `onTrace` as the agents work;
- *  the promise resolves with the final reply, or rejects with the named error. */
+type StreamEvent = { name: string; payload: unknown };
+
+/** The events of one SSE response, in order. Leaving the loop early closes the connection. */
+async function* streamEvents(body: NonNullable<Response["body"]>): AsyncGenerator<StreamEvent, void> {
+  const reader = body.pipeThrough(new TextDecoderStream()).getReader();
+  let buffer = "";
+  try {
+    for (;;) {
+      const { value, done } = await reader.read();
+      if (done) return;
+      buffer += value;
+      let split: number;
+      while ((split = buffer.indexOf("\n\n")) >= 0) {
+        const frame = buffer.slice(0, split);
+        buffer = buffer.slice(split + 2);
+        const name = /^event: (.+)$/m.exec(frame)?.[1];
+        const data = /^data: (.+)$/m.exec(frame)?.[1];
+        if (name && data) yield { name, payload: JSON.parse(data) };
+      }
+    }
+  } finally {
+    reader.cancel().catch(() => undefined);
+  }
+}
+
+/** What follows the reply on the same stream: the illustrator's steps, then at most one drawing.
+ *  Reports exactly once, and never throws: after the reply, a broken stream is only a missing picture. */
+async function readDrawing(events: AsyncGenerator<StreamEvent, void>, onDrawing?: (drawing: Drawing | null) => void): Promise<void> {
+  let reported = false;
+  const report = (drawing: Drawing | null) => {
+    if (reported) return;
+    reported = true;
+    try { onDrawing?.(drawing); } catch { /* the caller's own handler: it cannot fail the reply either */ }
+  };
+  try {
+    // Read to the end, so the server closes the stream in its own time, but hand the picture over as it arrives.
+    for await (const { name, payload } of events) {
+      const sent = name === "drawing" ? (payload as Partial<Drawing> | null) : null;
+      if (sent && typeof sent.kind === "string" && Array.isArray(sent.values)) report(sent as Drawing);
+    }
+  } catch {
+    // The reply is already with the student. Nothing here may turn it into a failure.
+  }
+  report(null);
+}
+
+/** Send a student message. Trace events arrive through `onTrace` as the agents work on the
+ *  reply; the promise resolves with the final reply the moment it arrives, or rejects with
+ *  the named error.
+ *
+ *  A picture may follow the reply on the same stream. `onDrawing` is then called exactly once,
+ *  after the promise has resolved: with the drawing, or with null when the stream ends without one. */
 export async function sendMessage(
   sessionId: string,
   body: { text: string; problem_id: string; code: string },
   onTrace: (event: TraceEvent) => void,
+  onDrawing?: (drawing: Drawing | null) => void,
 ): Promise<FinalEvent> {
   const response = await fetch(`${API_URL}/sessions/${sessionId}/message`, {
     method: "POST", headers: { "content-type": "application/json", ...(await authHeaders()) }, body: JSON.stringify(body),
@@ -162,28 +221,25 @@ export async function sendMessage(
     const detail = await response.json().then((b) => b.detail, () => response.statusText);
     throw new ApiError(String(detail), response.status);
   }
-  const reader = response.body.pipeThrough(new TextDecoderStream()).getReader();
-  let buffer = "";
-  let final: FinalEvent | null = null;
-  for (;;) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buffer += value;
-    let split: number;
-    while ((split = buffer.indexOf("\n\n")) >= 0) {
-      const frame = buffer.slice(0, split);
-      buffer = buffer.slice(split + 2);
-      const name = /^event: (.+)$/m.exec(frame)?.[1];
-      const data = /^data: (.+)$/m.exec(frame)?.[1];
-      if (!name || !data) continue;
-      const payload = JSON.parse(data);
+  const events = streamEvents(response.body);
+  try {
+    for (;;) {
+      const next = await events.next();
+      if (next.done) throw new ApiError("The reply stream ended before a final event.");
+      const { name, payload } = next.value;
       if (name === "trace") onTrace(payload as TraceEvent);
-      else if (name === "final") final = payload as FinalEvent;
-      else if (name === "error") throw new ApiError(payload.message, undefined, payload.trace_id);
+      else if (name === "error") {
+        const failure = payload as { message: string; trace_id?: string };
+        throw new ApiError(failure.message, undefined, failure.trace_id);
+      } else if (name === "final") {
+        void readDrawing(events, onDrawing);  // keeps reading in the background; the reply does not wait
+        return payload as FinalEvent;
+      }
     }
+  } catch (err) {
+    void events.return();
+    throw err;
   }
-  if (!final) throw new ApiError("The reply stream ended before a final event.");
-  return final;
 }
 
 /** Live trace stream for a session: stored events first, then new ones. Returns a function that closes it. */

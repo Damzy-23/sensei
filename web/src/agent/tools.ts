@@ -24,7 +24,8 @@ export interface ToolSignatures {
   navigate: [{ page: PageId }, { page: PageId }];
   set_mode: [{ mode: Mode }, { mode: Mode }];
   open_problem: [{ problem_id: string }, { problem_id: string }];
-  ask_coach: [{ text: string }, { reply: string; hint_level: number; escalated: boolean }];
+  /** `drew` says what was drawn on the glass for this reply, without being asked: "Already on the glass for this reply: bars. <caption>". Null when nothing was drawn in time. */
+  ask_coach: [{ text: string }, { reply: string; hint_level: number; escalated: boolean; drew?: string | null }];
   run_tests: [Record<string, never>, { passed: number; failed: number; total: number; tests: { name: string; passed: boolean; message: string }[] }];
   run_code: [Record<string, never>, { stdout: string; error: string | null; truncated: boolean }];
   read_code: [Record<string, never>, { lines: number; code: string }];
@@ -72,9 +73,11 @@ export function registerTool<N extends ToolName>(name: N, handler: ToolHandler<N
 }
 
 /** Call a tool. Never throws: a failure comes back as `{ ok: false, error }` for the agent to read. */
-export async function invoke<N extends ToolName>(name: N, args: ToolSignatures[N][0]): Promise<ToolResult<N>> {
+export async function invoke<N extends ToolName>(name: N, args: ToolSignatures[N][0], options: { quiet?: boolean } = {}): Promise<ToolResult<N>> {
   const started = performance.now();
   const result = await run(name, args);
+  // quiet: the app acting for itself (a picture that comes with a typed reply), not the agent. Not shown in the feed.
+  if (options.quiet) return result;
   const call: ToolCall = {
     id: callCount++, name, args, ok: result.ok, error: result.ok ? null : result.error,
     ms: Math.round(performance.now() - started), at: Date.now(),

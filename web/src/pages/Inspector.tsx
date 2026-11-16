@@ -18,6 +18,7 @@ const ACTOR_COLOR: Record<string, string> = {
   guard: "var(--sky)",
   orchestrator: "var(--baltic)",
   hint_coach: "var(--sky)",
+  illustrator: "var(--seafoam)",
   interviewer: "var(--baltic)",
   evaluator: "var(--seafoam)",
   planner: "var(--seafoam)",
