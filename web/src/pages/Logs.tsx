@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getLogs, type ActivityLog, type TraceEvent } from "../api";
+import { getLogs, idTag, type ActivityLog, type TraceEvent } from "../api";
 
 const TYPES = [
   { id: "", label: "All" },
@@ -13,7 +13,10 @@ const money = (n: number) => (n === 0 ? "$0" : n < 0.01 ? `$${n.toFixed(4)}` : `
 const human = (s: string) => s.replace(/_/g, " ");
 const time = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
 
-/** Every agent action across all sessions: who did what, with which model or tool, and what it cost. */
+const ALL_SESSIONS = { fontSize: 12, marginTop: 6 } as const;
+
+/** The agents' actions: who did what, with which model or tool, and what it cost. A mentor is
+ *  shown every session. Anyone else is shown their own, with the whole system's totals beneath. */
 export function Logs() {
   const [actor, setActor] = useState("");
   const [type, setType] = useState("");
@@ -27,9 +30,20 @@ export function Logs() {
   }, [actor, type]);
   useEffect(load, [load]);
 
-  const totals = useMemo(() => (log?.summary ?? []).reduce(
+  // What the list and the agent tiles cover: the events the server read for this view.
+  const shown = useMemo(() => (log?.summary ?? []).reduce(
     (t, s) => ({ events: t.events + s.events, calls: t.calls + s.model_calls + s.tool_calls, cost: t.cost + s.cost_usd }),
     { events: 0, calls: 0, cost: 0 }), [log]);
+  // The three tiles say how much has been done. For a visitor that is their own sessions, with
+  // the whole system's totals beneath. For a mentor it is every session, so the tiles take the
+  // stored totals: the summary only counts the newest actions the server read. (Totals that
+  // lag a moment behind the list are passed over, so a tile is never smaller than the list.)
+  const whole = log?.totals_all ?? null;
+  const own = log?.scope === "own";
+  const everything = !own && whole && whole.events >= shown.events ? whole : null;
+  const tiles = everything ? { events: everything.events, calls: everything.model_calls + everything.tool_calls, cost: everything.cost_usd } : shown;
+  const everyone = own ? whole : null;
+  const newest = everything && everything.events > shown.events ? shown.events : null; // the agent tiles cover fewer actions than the tiles above
 
   return (
     <main className="page">
@@ -48,18 +62,37 @@ export function Logs() {
 
       {log && (
         <>
+          <p className="muted" style={{ margin: 0, fontSize: 13 }}>
+            {own ? "Showing your own sessions. Mentors on the team see every session." : "Showing every session."}
+            {!own && !whole && " The totals could not be read, so the tiles count the newest actions only."}
+          </p>
+
           <div className="log-stats">
-            <div className="card"><div className="label">Actions</div><div className="stat">{totals.events.toLocaleString()}</div></div>
-            <div className="card"><div className="label">Model and tool calls</div><div className="stat">{totals.calls.toLocaleString()}</div></div>
-            <div className="card"><div className="label">Spend</div><div className="stat">{money(totals.cost)}</div></div>
+            <div className="card">
+              <div className="label">Actions</div>
+              <div className="stat">{tiles.events.toLocaleString()}</div>
+              {everyone && <div className="mono dim" style={ALL_SESSIONS}>{everyone.events.toLocaleString()} across all sessions</div>}
+            </div>
+            <div className="card">
+              <div className="label">Model and tool calls</div>
+              <div className="stat">{tiles.calls.toLocaleString()}</div>
+              {everyone && <div className="mono dim" style={ALL_SESSIONS}>{(everyone.model_calls + everyone.tool_calls).toLocaleString()} across all sessions</div>}
+            </div>
+            <div className="card">
+              <div className="label">Spend</div>
+              <div className="stat">{money(tiles.cost)}</div>
+              {everyone && <div className="mono dim" style={ALL_SESSIONS}>{money(everyone.cost_usd)} across all sessions</div>}
+            </div>
           </div>
 
           <section className="card" aria-label="Agents">
-            <div className="label" style={{ marginBottom: 10 }}>Agents, by role</div>
+            <div className="label" style={{ marginBottom: 10 }}>
+              Agents, by role{newest !== null && ` · the newest ${newest.toLocaleString()} actions`}
+            </div>
             <div className="agent-grid">
               <button className={`agent-tile ${actor === "" ? "on" : ""}`} aria-pressed={actor === ""} onClick={() => setActor("")}>
                 <span className="agent-name">All agents</span>
-                <span className="agent-meta mono">{totals.events} actions</span>
+                <span className="agent-meta mono">{shown.events} actions</span>
               </button>
               {log.summary.map((s) => (
                 <button key={s.actor} className={`agent-tile ${actor === s.actor ? "on" : ""}`} aria-pressed={actor === s.actor} onClick={() => setActor(s.actor)}>
@@ -101,7 +134,7 @@ export function Logs() {
                       {e.input && <p><span className="label">Input</span> <span className="mono">{e.input}</span></p>}
                       {e.output && <p><span className="label">Output</span> <span className="mono">{e.output}</span></p>}
                       <p className="mono dim" style={{ fontSize: 11 }}>
-                        session {e.session_id} · trace {e.trace_id}{e.tokens_in != null && ` · ${e.tokens_in} in / ${e.tokens_out ?? 0} out tokens`}
+                        session {idTag(e.session_id)} · trace {idTag(e.trace_id)}{e.tokens_in != null && ` · ${e.tokens_in} in / ${e.tokens_out ?? 0} out tokens`}
                       </p>
                     </div>
                   )}

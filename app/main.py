@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api import eval as eval_routes
-from app.api.auth import require_user
+from app.api.auth import current_viewer
 from app.api import cv, logs, mentor, problems, profile, sessions, traces, tracks, voice
 
 app = FastAPI(title="Senior API", version="0.1.0")
@@ -26,8 +26,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Every route is answered for a viewer (a guest or a signed-in user), so a token that
+# does not verify is refused everywhere. What a viewer may see is decided in the routes.
 for module in (sessions, problems, tracks, traces, mentor, voice, cv, profile, logs, eval_routes):
-    app.include_router(module.router, dependencies=[Depends(require_user)])
+    app.include_router(module.router, dependencies=[Depends(current_viewer)])
 
 
 @app.get("/health", include_in_schema=False)
@@ -40,5 +42,3 @@ def health() -> dict[str, str]:
 WEB_DIST = Path(__file__).resolve().parent.parent / "web" / "dist"
 if WEB_DIST.is_dir():
     app.mount("/", StaticFiles(directory=WEB_DIST, html=True), name="web")
-for module in (sessions, problems, tracks, traces, mentor, voice, cv, logs, eval_routes):
-    app.include_router(module.router)

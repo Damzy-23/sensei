@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { subscribeTraces, type TraceEvent } from "../api";
+import { printable, subscribeTraces, type TraceEvent } from "../api";
 import { useApp } from "../app-context";
 
 type Filter = "all" | "guards" | "tools" | "llm";
@@ -309,7 +309,7 @@ export function Inspector() {
                       {selected.model} · {formatCount(selected.tokens_in)} in / {formatCount(selected.tokens_out)} out · {formatCost(selected.cost_usd)}
                     </div>
                   )}
-                  <pre className="json">{JSON.stringify(selected, null, 2)}</pre>
+                  <pre className="json">{JSON.stringify(printable(selected), null, 2)}</pre>
                 </>
               )}
             </section>

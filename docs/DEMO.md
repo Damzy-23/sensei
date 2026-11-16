@@ -4,6 +4,9 @@ Live: https://senior-coach-ai.web.app
 
 ## Set up before you go on (5 minutes before)
 
+Open both tabs in the same browser: they share the list of your sessions, which is what lets
+Tab 2 see Tab 1's ticket. A mentor on another device must be signed in with a team mentor email.
+
 1. **Tab 1, the student.** Start a session (guest is fine). Open **Container With Most Water**
    from the Learn path. Paste the buggy solution below and click **Run tests** once: 1 of 2 pass.
    Then send these two messages, so a mentor ticket already exists:
@@ -37,7 +40,7 @@ Mentor reply: "Look at line 5: which of the two walls actually limits how much w
 
 **1:10 to 1:40, a human when it matters (Tab 2).** "Earlier this student got frustrated twice, so Senior handed them to a person with the transcript, the code and a suggested intervention." Click **Send reply**, switch to Tab 1, and wait for the mentor's message to appear (about 3 seconds). "The mentor's reply lands right in the student's chat."
 
-**1:40 to 1:55, the record.** Click **Activity log** under Behind the scenes. "Every action by every agent, across every session, kept permanently: which role, which model or tool, and what it cost."
+**1:40 to 1:55, the record.** Click **Activity log** under Behind the scenes. "Every action by every agent in my sessions, kept permanently: which role, which model or tool, and what it cost. I see my own sessions; the team's mentors see them all."
 
 **1:55 to 2:00, close.** "Hints, not answers. Rules you can read. A human when it matters. Every step on the record. That's Senior."
 
@@ -58,6 +61,8 @@ Live: https://senior-coach-ai.web.app
 - Open the site once, about 2 minutes before, so the server is awake.
 - Sign in with Google or choose "Try it as a guest". Guest works without any setup.
 - In a second tab, open the site again on **Mentor**. That tab plays the human mentor.
+  Both tabs must be in the same browser (they share the list of your sessions); a mentor on
+  another device must be signed in with a team mentor email.
 - Have this ready to paste into the editor (it fails on purpose):
 
 ```python
@@ -99,9 +104,10 @@ Type a reply and send it: it lands in the student's chat.
 
 ## 5. Everything is on the record (20 s), on the Activity log
 
-"Every action by every agent, across all sessions, kept permanently: which role, which
-model or tool, the tokens and the spend." Click an agent to filter, then a row to see
-its decision and reason.
+"Every action by every agent in my sessions, kept permanently: which role, which model or
+tool, the tokens and the spend. A visitor sees their own sessions, the team's mentors see
+them all, and the small numbers are the whole system's totals." Click an agent to filter,
+then a row to see its decision and reason.
 
 ## 6. Beyond the problem (40 s)
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections import defaultdict
+from collections.abc import Sequence
 
 from app.db import get_conn, write_lock
 from app.tracing import archive
@@ -75,6 +76,33 @@ def recent_events(limit: int = 500) -> list[TraceEvent]:
         return archive.recent(limit)
     rows = get_conn().execute("SELECT * FROM events ORDER BY rowid DESC LIMIT ?", (limit,)).fetchall()
     return [TraceEvent(**dict(row)) for row in rows]
+
+
+def events_for_sessions(session_ids: Sequence[str], limit: int = 500) -> list[TraceEvent]:
+    """The newest `limit` events of these sessions, newest first. The query names the
+    sessions, so no other session's event is ever loaded, however busy the log is."""
+    if not session_ids:
+        return []
+    if archive.enabled():
+        return archive.for_sessions(list(session_ids), limit)
+    marks = ",".join("?" for _ in session_ids)
+    rows = get_conn().execute(
+        f"SELECT * FROM events WHERE session_id IN ({marks}) ORDER BY rowid DESC LIMIT ?",
+        (*session_ids, limit),
+    ).fetchall()
+    return [TraceEvent(**dict(row)) for row in rows]
+
+
+def totals() -> dict[str, float]:
+    """How much the whole system has done, over every stored event of every session.
+    Counts and spend only: no text and no ids, so it is safe to show to anyone."""
+    if archive.enabled():
+        return archive.totals()
+    row = get_conn().execute(
+        "SELECT COUNT(*) AS events, COALESCE(SUM(type = 'llm.call'), 0) AS model_calls, "
+        "COALESCE(SUM(type LIKE 'tool%'), 0) AS tool_calls, COALESCE(SUM(cost_usd), 0.0) AS cost_usd FROM events"
+    ).fetchone()
+    return dict(row)
 
 
 def build_tree(events: list[TraceEvent]) -> list[TraceNode]:

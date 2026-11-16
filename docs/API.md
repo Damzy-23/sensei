@@ -34,6 +34,48 @@ Run: `uvicorn app.main:app --reload --port 8000`
 
 ---
 
+## Who can see what
+
+Nobody has to sign in. Every request is answered for a viewer: a guest, or a signed-in user.
+
+| Viewer | Sees and can act on |
+|---|---|
+| Anyone, guest or signed in | The sessions their own browser started: those sessions' activity and mentor tickets |
+| A mentor | Every session |
+
+- **A session id is the key to a session.** It is unguessable (`ses_` + 12 hex digits). The browser
+  remembers the ids of the sessions it starts (the newest 30, in `localStorage`) and sends them with
+  every request in the header `X-Senior-Sessions: ses_3f9a1c0d2e4b,ses_77aa01bc93de`. Ids that are
+  not well formed are ignored, and at most 30 are read.
+- **A mentor** is a signed-in user whose verified email is listed in `SENSEI_MENTOR_EMAILS`. The
+  sign-in is a Firebase ID token in `Authorization: Bearer <token>` (or `?token=` for EventSource),
+  and it can only be checked when `SENSEI_AUTH_PROJECT` names the Firebase project. A token that
+  does not verify answers `401`. No token is a guest, never an error.
+- **Scoped routes:** `GET /logs` and everything under `/mentor/tickets`. A ticket of a session the
+  viewer does not hold answers `404`, the same as a ticket that does not exist.
+- **Routes keyed by an unguessable id are not scoped:** `/sessions/{session_id}/...` and
+  `/traces/{trace_id}` answer whoever knows the id. No scoped route returns another session's
+  session id, trace id or ticket id.
+- **An id is never shown whole.** Knowing a session id is the same as holding the session, and
+  `/traces/{trace_id}` answers with the session id. So the web app prints only the last four
+  characters of either (`…2e4b`): nobody can read a key off a shared screen or a screenshot.
+
+| Setting | Meaning |
+|---|---|
+| `SENSEI_SCOPE_DATA=1` | Switches the rules above on. Unset, every caller sees every session, as before: fine on your own machine, not on a public server. |
+| `SENSEI_MENTOR_EMAILS` | The mentors' emails, comma separated. Case does not matter. Empty means there are no mentors. |
+| `SENSEI_AUTH_PROJECT` | The Firebase project whose tokens are accepted. With scoping off it also makes every call need a sign-in, as before. |
+
+**Switching it on, on a server that is live.** The order matters:
+
+1. Set `SENSEI_SCOPE_DATA=1` first. The code from before scoping ignores it, and a deploy keeps it.
+2. Then deploy this code (merging to the deploy branch does it). Visitors now see only their own sessions.
+3. Only then set `SENSEI_AUTH_PROJECT` and `SENSEI_MENTOR_EMAILS`, both in one update. Never set
+   `SENSEI_AUTH_PROJECT` alone, or before steps 1 and 2 are live: with scoping off it puts every
+   call behind a sign-in, and every guest gets `401`.
+
+---
+
 ## Sessions
 
 ### `POST /sessions` → 201
@@ -252,6 +294,15 @@ Full span tree for one student message. Use `roots[].children` to draw the tree.
 
 Tickets are created automatically when a session escalates (hint level 5 still failing, 3 guard violations, or frustration flagged twice).
 
+A mentor works the whole queue. Anyone else gets the tickets of their own sessions, and `404` for
+any other ticket id (see [Who can see what](#who-can-see-what)).
+
+### `GET /mentor/scope` → 200
+Whose tickets this caller's queue holds: `"all"` for a mentor, or when scoping is off; otherwise `"own"`.
+```json
+{ "scope": "own" }
+```
+
 ### `GET /mentor/tickets` → 200
 ```json
 [
@@ -281,6 +332,32 @@ Response: the new chat message. It is also inserted into the student's chat with
 
 ### `POST /mentor/tickets/{ticket_id}/resolve` → 200 | 404
 Response: the ticket with `"status": "resolved"`. The session's `escalated` flag clears.
+
+---
+
+## Activity log
+
+### `GET /logs` → 200
+The agents' actions, newest first, with a summary per agent. Query: `actor`, `type` (a prefix such
+as `llm`, `tool`, `guard`), `session_id` and `limit` (1 to 1000, default 300). The filters narrow
+the list; `session_id` never widens what the caller may see.
+```json
+{
+  "events": [ { "event_id": "evt_0005", "session_id": "ses_3f9a1c0d2e4b", "actor": "hint_coach", "type": "llm.call", "...": "..." } ],
+  "summary": [
+    { "actor": "hint_coach", "events": 2, "model_calls": 1, "tool_calls": 0, "blocked": 0, "errors": 0, "tokens_in": 640, "tokens_out": 70, "cost_usd": 0.0029 }
+  ],
+  "durable": false,
+  "scope": "own",
+  "totals_all": { "events": 4310, "model_calls": 1204, "tool_calls": 96, "cost_usd": 3.18 }
+}
+```
+- `scope` is `"all"` for a mentor (or when scoping is off): `events` and `summary` cover every
+  session. Otherwise it is `"own"`: they cover only the sessions the caller holds.
+- `totals_all` always covers every session, so the screen can say how much the whole system has
+  done. It holds these four numbers and nothing else: no text and no ids. It is `null` if the
+  totals could not be read; the rest of the log is still returned.
+- `durable` is true when the log is read from the Firestore archive.
 
 ---
 

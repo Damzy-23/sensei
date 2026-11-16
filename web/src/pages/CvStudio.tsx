@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { API_URL, authHeaders } from "../api";
+import { API_URL, authHeaders, idTag } from "../api";
 
 // Mirrors app/api/cv.py. Scores are computed by rule on the server; this page only shows them.
 interface Check { id: string; label: string; points: number; max: number; detail: string }
@@ -62,7 +62,7 @@ async function readError(response: Response): Promise<string> {
   if (Array.isArray(detail)) return detail.map((d: { msg?: string }) => d.msg ?? "").filter(Boolean).join(" ");
   if (detail && typeof detail === "object") {
     const inner = detail as { detail?: string; trace_id?: string };
-    return `${inner.detail ?? "The CV writer failed."}${inner.trace_id ? ` (trace ${inner.trace_id})` : ""}`;
+    return `${inner.detail ?? "The CV writer failed."}${inner.trace_id ? ` (trace ${idTag(inner.trace_id)})` : ""}`;
   }
   return `The server answered ${response.status}.`;
 }
@@ -349,7 +349,7 @@ export function CvStudio() {
               <Paper cv={cv} />
               <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
                 <button className="btn-primary" onClick={() => window.print()}>Download PDF</button>
-                <span className="dim" style={{ fontSize: 12 }}>Opens the print dialog: choose “Save as PDF”. Trace {cv.trace_id}</span>
+                <span className="dim" style={{ fontSize: 12 }}>Opens the print dialog: choose “Save as PDF”. Trace {idTag(cv.trace_id)}</span>
               </div>
 
               <div className="cv-tools">

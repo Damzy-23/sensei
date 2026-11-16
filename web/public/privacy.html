@@ -50,7 +50,7 @@ footer { margin-top:56px; padding-top:20px; padding-bottom:40px; border-top:1px 
 <ul>
   <li><strong>Your account, if you sign in.</strong> With Google sign-in we receive your name, email address and profile photo from Google. With email sign-in, your email address. Guests are not asked for any of this.</li>
   <li><strong>What you send the coach.</strong> Your messages, your code, your test results and the hints you receive.</li>
-  <li><strong>How the agents answered.</strong> A record of each step the AI agents take: which agent acted, which model or tool it used, tokens, cost, timing, and the decision and its reason. This is the Activity log and the Agent inspector.</li>
+  <li><strong>How the agents answered.</strong> A record of each step the AI agents take: which agent acted, which model or tool it used, tokens, cost, timing, the decision and its reason, and the first 500 characters of what went in and came out. This is the Activity log and the Agent inspector.</li>
   <li><strong>Optional features.</strong> Answers you give in the Profile interview, a job description and CV you paste into the CV studio, the name you type for a voice call, and the audio of a voice call while it is live.</li>
 </ul>
 
@@ -58,10 +58,18 @@ footer { margin-top:56px; padding-top:20px; padding-bottom:40px; border-top:1px 
 <ul>
   <li>To give hints, run mock interviews and recommend roles.</li>
   <li>To hand a stuck session to a human mentor, who sees the transcript and your code.</li>
-  <li>To show, in the Agent inspector and Activity log, exactly what the agents did and why.</li>
+  <li>To show you, in the Agent inspector and Activity log, exactly what the agents did in your sessions and why.</li>
   <li>To find and fix problems with the app.</li>
 </ul>
 <p>We do not sell your data, and we do not use it for advertising.</p>
+
+<h2>Who can see your sessions</h2>
+<ul>
+  <li><strong>Other visitors cannot.</strong> They cannot read your messages, your code or your mentor tickets. The Activity log and the Mentor page show each visitor their own sessions only.</li>
+  <li><strong>Mentors on the Senior team can.</strong> They can read every session: the messages, the code, what was entered in the Profile interview and the CV studio, and the record of what the agents did. This is how they answer a stuck session and fix problems.</li>
+  <li><strong>Everyone sees a few totals for the whole system:</strong> how many actions the agents have taken, how many model and tool calls, and the spend. These are numbers only. They contain nothing you typed.</li>
+  <li><strong>How Senior knows a session is yours.</strong> Each session has a long random id that works like a key. Your browser keeps the ids of the sessions you start, in its local storage, and sends them with each request. Anyone who has a session's id can open that session, so do not share one. Senior's own screens show only the last four characters of an id. On a shared computer, the next person to use the same browser can see those sessions until this site's data is cleared. Once it is cleared and Senior's tabs are closed, the list is gone and the sessions no longer appear for you either.</li>
+</ul>
 
 <h2>Services that process your data</h2>
 <ul>

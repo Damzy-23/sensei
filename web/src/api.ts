@@ -44,9 +44,50 @@ export class ApiError extends Error {
   constructor(message: string, readonly status?: number, readonly traceId?: string) { super(message); }
 }
 
+// The sessions this browser has started, newest first. The API shows a visitor only the
+// data of sessions they hold, and a session id is the proof: it is unguessable, and it is
+// sent with every request. Kept in localStorage so every tab of this browser shares the list.
+const SESSIONS_KEY = "senior.sessions";
+const MAX_SESSIONS = 30;
+const SESSION_ID = /^ses_[0-9a-z_]{1,40}$/;
+let sessionsThisTab: string[] = []; // newest first; also the whole list when storage is unavailable
+
+/** Newest first, 30 at most. This tab's current session leads, so it is always sent; the list
+ *  every tab shares follows, and it is in the order the sessions were started. If the shared
+ *  list has lost one of this tab's sessions (site data was cleared, or other tabs started
+ *  thirty newer ones), it is written back here, so the other tabs see the session again. */
+function heldSessions(): string[] {
+  let stored: string[] = [];
+  try { stored = (localStorage.getItem(SESSIONS_KEY) ?? "").split(","); } catch { /* storage is blocked */ }
+  const all = [...sessionsThisTab.slice(0, 1), ...stored, ...sessionsThisTab].filter((id) => SESSION_ID.test(id));
+  const held = [...new Set(all)].slice(0, MAX_SESSIONS);
+  if (held.some((id) => !stored.includes(id))) {
+    try { localStorage.setItem(SESSIONS_KEY, held.join(",")); } catch { /* private window: this tab still remembers */ }
+  }
+  return held;
+}
+
+function rememberSession(sessionId: string): string {
+  sessionsThisTab = [sessionId, ...sessionsThisTab].slice(0, MAX_SESSIONS);
+  heldSessions(); // reads the shared list afresh, as another tab may have added to it, and writes the new id in
+  return sessionId;
+}
+
+/** How an id is shown on screen. A session id is the key to its session, and a trace id leads
+ *  to one, so neither is ever printed whole: a shared screen or a photo of the page must not
+ *  hand a session to whoever is watching. The last four characters tell two rows apart. */
+export const idTag = (id: string): string => (id.length > 8 ? `…${id.slice(-4)}` : id);
+/** A trace event as it may be printed: every field, with the session and trace ids as tags. */
+export const printable = (event: TraceEvent): TraceEvent => ({ ...event, session_id: idTag(event.session_id), trace_id: idTag(event.trace_id) });
+
+/** Who is calling: the sign-in token, if any, and the sessions this browser holds. */
 export async function authHeaders(): Promise<Record<string, string>> {
   const token = await idToken();
-  return token ? { authorization: `Bearer ${token}` } : {};
+  const sessions = heldSessions();
+  return {
+    ...(token ? { authorization: `Bearer ${token}` } : {}),
+    ...(sessions.length ? { "x-senior-sessions": sessions.join(",") } : {}),
+  };
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -59,7 +100,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 }
 const post = <T>(path: string, body?: unknown) => request<T>(path, { method: "POST", body: body === undefined ? undefined : JSON.stringify(body) });
 
-export const createSession = (mode: Mode) => post<{ session_id: string }>("/sessions", { mode }).then((r) => r.session_id);
+export const createSession = (mode: Mode) => post<{ session_id: string }>("/sessions", { mode }).then((r) => rememberSession(r.session_id));
 export const getState = (sessionId: string) => request<SessionState>(`/sessions/${sessionId}/state`);
 export const postRun = (sessionId: string, run: RunIn) => post<RunOut>(`/sessions/${sessionId}/runs`, run);
 export const listTracks = () => request<TrackSummary[]>("/tracks");
@@ -67,6 +108,8 @@ export const getTrack = (trackId: string) => request<Track>(`/tracks/${trackId}`
 export const getProblem = (problemId: string) => request<ProblemDetail>(`/problems/${problemId}`);
 export const getTrace = (traceId: string) => request<TraceTree>(`/traces/${traceId}`);
 export const listTickets = () => request<Ticket[]>("/mentor/tickets");
+/** Whether the queue holds every ticket (a mentor) or only those of the viewer's own sessions. */
+export const getQueueScope = () => request<{ scope: "all" | "own" }>("/mentor/scope").then((r) => r.scope);
 export const getMentorMessages = (sessionId: string) => request<ChatMessage[]>(`/sessions/${sessionId}/mentor-messages`);
 export const getTicket = (ticketId: string) => request<TicketDetail>(`/mentor/tickets/${ticketId}`);
 export const replyTicket = (ticketId: string, text: string) => post<ChatMessage>(`/mentor/tickets/${ticketId}/reply`, { text });
@@ -83,7 +126,11 @@ export const getPanel = (sessionId: string) => request<PanelView>(`/sessions/${s
 export const postDebrief = (sessionId: string) => post<Debrief>(`/sessions/${sessionId}/debrief`);
 export const startVoiceSession = () => post<{ signed_url: string; agent_id: string }>("/voice/session");
 export interface ActorSummary { actor: string; events: number; model_calls: number; tool_calls: number; blocked: number; errors: number; tokens_in: number; tokens_out: number; cost_usd: number }
-export interface ActivityLog { events: TraceEvent[]; summary: ActorSummary[]; durable: boolean }
+/** Counts over every session. Numbers only, so any visitor may see them. */
+export interface LogTotals { events: number; model_calls: number; tool_calls: number; cost_usd: number }
+/** `scope` says whose sessions `events` and `summary` cover: every session for a mentor, the
+ *  viewer's own otherwise. `totals_all` always covers every session; null if it could not be read. */
+export interface ActivityLog { events: TraceEvent[]; summary: ActorSummary[]; durable: boolean; scope: "all" | "own"; totals_all: LogTotals | null }
 export const getLogs = (filter: { actor?: string; type?: string }) =>
   request<ActivityLog>(`/logs?${new URLSearchParams(Object.entries(filter).filter(([, v]) => v) as [string, string][])}`);
 export const resolveTicket = (ticketId: string) => post<Ticket>(`/mentor/tickets/${ticketId}/resolve`);
