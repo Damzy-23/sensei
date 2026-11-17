@@ -1,4 +1,4 @@
-"""Sensei FastAPI app.
+"""Senior FastAPI app.
 
 SSE framing: each message is `event: <name>` + `data: <json>` + blank line.
 Event names: `trace` (one per TraceEvent, live), `final` (FinalEvent), `error`, `end`,
@@ -38,7 +38,7 @@ from app.orchestrator.pipeline import handle_message, handle_run
 from app.tools import escalation as escalation_tools
 from app.tracing import store
 
-app = FastAPI(title="Sensei API", version="0.3.0")
+app = FastAPI(title="Senior API", version="0.3.0")
 
 # Open CORS for development (hackathon scope).
 app.add_middleware(

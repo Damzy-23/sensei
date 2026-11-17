@@ -1,1 +1,1 @@
-"""Sensei backend."""
+"""Senior backend."""

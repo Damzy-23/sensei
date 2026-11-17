@@ -1,8 +1,8 @@
-# Sensei: AI coding-interview coach (backend)
+# Senior: AI coding-interview coach (backend)
 
 > **Live demo: https://senior-coach-ai.web.app** (try it as a guest, no account needed). The web app and the code behind it are on the [`architecture-layout`](https://github.com/Damzy-23/sensei/tree/architecture-layout) branch.
 
-Sensei gives a student an interview problem, runs their tests in the browser, and coaches them
+Senior gives a student an interview problem, runs their tests in the browser, and coaches them
 through a ladder of hints. It never gives the full solution. It tracks session state and changes
 mode (Learn, Interview, Blitz) with a visible reason. If the student stays stuck, a human mentor
 takes over in the same chat.
@@ -18,7 +18,7 @@ Requires Python 3.11 or newer.
 python -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt   # macOS/Linux: .venv/bin/python
 cp .env.example .env                                     # add ANTHROPIC_API_KEY to run real models
-python scripts/validate_bank.py                          # all 12 reference solutions must pass
+python scripts/validate_bank.py                          # all 14 reference solutions must pass
 python -m pytest                                         # 267 tests, no network
 .venv\Scripts\python -m uvicorn app.main:app --port 8000
 ```
